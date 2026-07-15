@@ -80,19 +80,30 @@ const CadenceSync = (() => {
 
   /* ---------- realtime (live cross-device updates) ---------- */
   let channel = null;
+  let everSubscribed = false;
   // Pushes any insert/update/delete on this user's rows to onEvent/onSettings
   // as it happens — including this device's own writes echoing back, which
-  // callers should treat as a harmless idempotent no-op.
-  function subscribeRealtime(userId, onEvent, onSettings) {
+  // callers should treat as a harmless idempotent no-op. onReconnect (if
+  // given) fires whenever the socket (re)establishes — including after a
+  // drop — so the caller can do a full catch-up fetch for anything missed
+  // while disconnected.
+  function subscribeRealtime(userId, onEvent, onSettings, onReconnect) {
     if (!configured) return;
     unsubscribeRealtime();
+    everSubscribed = false;
     channel = client.channel('cadence-' + userId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `user_id=eq.${userId}` }, onEvent)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `user_id=eq.${userId}` }, onSettings)
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          if (everSubscribed && onReconnect) onReconnect(); // a real reconnect, not the first connect
+          everSubscribed = true;
+        }
+      });
   }
   function unsubscribeRealtime() {
     if (channel) { client.removeChannel(channel); channel = null; }
+    everSubscribed = false;
   }
 
   /* ---------- outbox (pending writes, offline-safe) ---------- */

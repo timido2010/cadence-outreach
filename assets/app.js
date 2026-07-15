@@ -808,18 +808,30 @@ function translateAuthError(error){
   return 'שגיאה: '+m;
 }
 
-// Reconcile the cloud snapshot with anything still local-only: events that
-// pre-date this device's sync (or were made offline) get folded in and
-// re-queued for push; anything already sitting in the outbox (unconfirmed
-// upserts/deletes/settings) is re-applied on top so it isn't lost mid-flight.
-function mergeCloudIntoState(cloud, preExistingLocal){
+// Reconcile local state with the cloud. Cloud is authoritative — a local
+// event missing from it is presumed intentionally deleted (e.g. from
+// another device), NOT "not yet synced", so it is dropped rather than
+// resurrected. The only thing preserved on top of the cloud snapshot is
+// this device's own outbox: genuinely pending upserts/deletes/settings that
+// haven't been confirmed yet.
+//
+// Exception: a brand-new account that has never synced anything before
+// (cloud has zero events and no settings row) — there, any current local
+// data is presumed pre-existing device data that needs migrating up, not
+// something to discard.
+function applyCloudSnapshot(cloud){
   const byId=new Map(cloud.events.map(e=>[e.id,e]));
-  preExistingLocal.forEach(ev=>{
-    if(!byId.has(ev.id)){
-      byId.set(ev.id, ev);
-      CadenceSync.enqueueUpsertEvent(CadenceSync.eventToRow(ev, currentUserId));
-    }
-  });
+  const isFirstEverSync = cloud.events.length===0 && !cloud.goals;
+
+  if(isFirstEverSync){
+    state.events.forEach(ev=>{
+      if(!byId.has(ev.id)){
+        byId.set(ev.id, ev);
+        CadenceSync.enqueueUpsertEvent(CadenceSync.eventToRow(ev, currentUserId));
+      }
+    });
+  }
+
   const pending=CadenceSync.peekOutbox();
   pending.forEach(op=>{
     if(op.type==='upsert_event')byId.set(op.row.id, CadenceSync.rowToEvent(op.row));
@@ -832,15 +844,14 @@ function mergeCloudIntoState(cloud, preExistingLocal){
   if(settingsOp){ goals=settingsOp.row.goals; audience=settingsOp.row.audience; }
   state={events,goals,audience};
   save();
-  if(!cloud.goals) pushSettings(); // brand-new account: seed its settings row
+  if(isFirstEverSync) pushSettings(); // seed this brand-new account's settings row
 }
 
 async function onSignedIn(session){
   currentUserId=session.user.id;
-  const preExistingLocal=state.events.slice();
   try{
     const cloud=await CadenceSync.fetchAll(currentUserId);
-    mergeCloudIntoState(cloud, preExistingLocal);
+    applyCloudSnapshot(cloud);
   }catch(e){
     toast('אין חיבור לענן כרגע — עובד מהעותק המקומי','undo');
   }
@@ -849,13 +860,36 @@ async function onSignedIn(session){
   renderDashboard();
   setView(ui.view||'dashboard');
   CadenceSync.flush();
-  CadenceSync.subscribeRealtime(currentUserId, onRemoteEventChange, onRemoteSettingsChange);
+  CadenceSync.subscribeRealtime(currentUserId, onRemoteEventChange, onRemoteSettingsChange, resyncFromCloud);
 }
 function onSignedOut(){
   currentUserId=null;
   document.getElementById('authForm').reset();
   showAuthScreen();
 }
+
+// Realtime only reaches a device that's actively connected the instant a
+// change happens — a backgrounded tab, a locked phone, or a brief network
+// drop means it's silently missed with no way to know. This does a full
+// re-fetch-and-merge (same as sign-in) so a missed change self-heals as
+// soon as the device comes back, instead of staying wrong until a manual
+// refresh. Triggered on tab focus, reconnect, and realtime resubscribe.
+let resyncing=false;
+async function resyncFromCloud(){
+  if(!currentUserId||resyncing)return;
+  resyncing=true;
+  try{
+    const cloud=await CadenceSync.fetchAll(currentUserId);
+    applyCloudSnapshot(cloud);
+    renderAll();
+  }catch(e){
+    // offline or transient — next trigger (focus/online/reconnect) will retry
+  }finally{
+    resyncing=false;
+  }
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible')resyncFromCloud(); });
+window.addEventListener('online',resyncFromCloud);
 
 // Live cross-device updates: a change made on another signed-in device (or
 // this one, echoing its own write back) arrives here and is folded straight
