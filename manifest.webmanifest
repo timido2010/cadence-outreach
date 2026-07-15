@@ -1,0 +1,14 @@
+{
+  "name": "Cadence — Outreach Tracker",
+  "short_name": "Cadence",
+  "description": "Fast, mobile-first tracker for real estate outreach and conversion stats.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1016",
+  "theme_color": "#0b1016",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,8 +1,14 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b1016" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Cadence" />
 <title>Cadence — Outreach Tracker</title>
-<link rel="stylesheet" href="assets/styles.css" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="assets/icon.svg" />
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="assets/styles.css?v=2" />
 <!-- HTML lives in index.html; app boots from assets/app.js at the end of body -->
 <div id="app">
   <!-- ===== Top bar ===== -->
@@ -108,6 +114,15 @@
       <div class="bento stats-bento" id="statTiles"></div>
 
       <div class="card">
+        <div class="card-head"><h2>Trend</h2><span class="card-sub" id="trendLabel">Last 14 days</span></div>
+        <div id="trendChart" class="trend"></div>
+        <div class="trend-legend">
+          <span><i class="dot-call"></i>Calls</span>
+          <span><i class="dot-meet"></i>Meetings completed</span>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-head"><h2>Stage conversion</h2><span class="card-sub" id="convFunnelLabel">Full funnel</span></div>
         <div id="conversions"></div>
       </div>
@@ -165,4 +180,4 @@
 
   <div id="toast" class="toast" hidden></div>
 </div>
-<script src="assets/app.js"></script>
+<script src="assets/app.js?v=2"></script>

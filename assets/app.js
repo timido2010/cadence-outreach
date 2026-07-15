@@ -421,8 +421,57 @@ function renderStats(){
     </div>`).join('');
   paintIcons(document.getElementById('statTiles'));
 
+  renderTrend();
   renderConversions(c);
   renderRatios(c);
+}
+
+/* Trend chart — daily (or weekly) buckets of calls, with gold dots on days
+   that closed a completed meeting. Adapts its window to the selected range. */
+function buildTrend(){
+  const audOk=ev=>(ui.filter==='all'||ev.audience===ui.filter);
+  const now=new Date();
+  const buckets=[];
+  if(ui.range==='all'){
+    const start=weekStart(now);
+    for(let i=11;i>=0;i--){ const s=new Date(start); s.setDate(s.getDate()-i*7); const e=new Date(s); e.setDate(e.getDate()+7);
+      buckets.push({label:`${s.getMonth()+1}/${s.getDate()}`, from:s, to:e}); }
+    document.getElementById('trendLabel').textContent='Last 12 weeks';
+  }else{
+    const days= ui.range==='month'?30:7;
+    for(let i=days-1;i>=0;i--){ const d=new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
+      buckets.push({label:String(d.getDate()), dk:keyOf(d)}); }
+    document.getElementById('trendLabel').textContent=`Last ${days} days`;
+  }
+  buckets.forEach(b=>{
+    let calls=0, meets=0;
+    for(const ev of state.events){
+      if(!audOk(ev))continue;
+      const inb = b.dk!==undefined ? ev.dateKey===b.dk : (()=>{ const d=parseKey(ev.dateKey); return d>=b.from && d<b.to; })();
+      if(!inb)continue;
+      calls+=ev.deltas.call||0; meets+=ev.deltas.meetingCompleted||0;
+    }
+    b.calls=Math.max(0,calls); b.meets=Math.max(0,meets);
+  });
+  return buckets;
+}
+function renderTrend(){
+  const el=document.getElementById('trendChart');
+  const data=buildTrend();
+  const total=data.reduce((s,b)=>s+b.calls,0);
+  if(total===0){ el.classList.remove('dense'); el.innerHTML='<div class="log-empty">Not enough data yet.</div>'; return; }
+  const maxC=Math.max(1,...data.map(d=>d.calls));
+  el.classList.toggle('dense', data.length>10);
+  el.innerHTML=data.map(b=>{
+    const h=(b.calls/maxC*100).toFixed(1);
+    return `<div class="tcol" title="${b.label}: ${b.calls} calls, ${b.meets} meetings completed">
+      <div class="tbar-wrap">
+        ${b.meets>0?`<span class="tdot"></span>`:''}
+        <div class="tbar" style="height:${h}%"></div>
+      </div>
+      <span class="tlabel">${b.label}</span>
+    </div>`;
+  }).join('');
 }
 
 function renderConversions(c){
@@ -586,6 +635,11 @@ function wire(){
       lastToday=t;
     }
   }, 30000);
+}
+
+/* Offline support — register the service worker when served over http(s). */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 
 /* boot */

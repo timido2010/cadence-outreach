@@ -16,7 +16,12 @@ No build step, no dependencies. Either:
   ```
   then visit `http://<your-computer-ip>:8777/` on your phone.
 
-Add it to your phone's home screen for an app-like, full-screen experience.
+### Install as an app (offline)
+Cadence is a PWA. Serve it over `http`/`https` (or `localhost`), open it in the
+phone browser, and choose **Add to Home Screen** / **Install**. It then launches
+full-screen and **works with no connection** — a service worker caches the app
+shell, and all your data is local anyway. (Install requires being served, not
+opened as a `file://` path.)
 
 ## How it works
 
@@ -55,6 +60,9 @@ conversion, and efficiency ratios (calls per meeting, calls per signed
 agreement, meetings per signed agreement). Any calculation without enough data
 shows **"Not enough data"** instead of dividing by zero.
 
+A **Trend** chart shows call volume per day (or per week for All Time), with a
+gold dot on any day you completed a meeting — so momentum is visible at a glance.
+
 ### Days & corrections
 - Each calendar day opens fresh from zero; history is kept.
 - Tap the date pill to **view or edit any previous day**.
@@ -74,7 +82,14 @@ offline. Data model is a single append-only event log; all counters and stats
 are derived from it, which keeps undo and corrections consistent.
 
 ```
-index.html        markup + layout
-assets/styles.css  muted-slate theme, glass cards, bento grid
-assets/app.js      data model, funnel logic, stats, persistence
+index.html            markup + layout
+assets/styles.css      muted-slate theme, glass cards, bento grid, trend chart
+assets/app.js          data model, funnel logic, stats, trend, persistence
+assets/icon.svg        app icon
+manifest.webmanifest   PWA metadata (installable)
+sw.js                  service worker — offline app shell cache
 ```
+
+When you change `app.js` or `styles.css`, bump the `?v=` query in `index.html`
+and the matching `CACHE`/`ASSETS` version in `sw.js` so installed clients pick
+up the update.
