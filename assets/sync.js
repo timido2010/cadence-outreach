@@ -149,8 +149,16 @@ const CadenceSync = (() => {
     if (flushing) { reflushNeeded = true; return; } // an op landed mid-flush; re-run once this pass ends
     flushing = true;
     try {
-      let box = loadOutbox();
-      while (box.length) {
+      while (true) {
+        // Always re-read fresh — never hold an in-memory copy across an
+        // `await`. A fast second action can get queued (appended to
+        // storage) while the first is still mid-upload; holding a stale
+        // snapshot here and writing it back afterward would silently wipe
+        // out that newly-queued item. Only this loop ever removes items
+        // (always from the front), and other code only ever appends to the
+        // end, so re-reading before each removal is always safe.
+        const box = loadOutbox();
+        if (!box.length) break;
         const op = box[0];
         try {
           if (op.type === 'upsert_event') {
@@ -166,8 +174,9 @@ const CadenceSync = (() => {
         } catch (err) {
           break; // network/transient failure — stop, keep remaining ops queued for later
         }
-        box.shift();
-        saveOutbox(box);
+        const remaining = loadOutbox();
+        remaining.shift();
+        saveOutbox(remaining);
       }
     } finally {
       flushing = false;
