@@ -44,6 +44,7 @@ const CadenceSync = (() => {
   }
   async function signOut() {
     clearOutbox();
+    unsubscribeRealtime();
     await client.auth.signOut();
   }
 
@@ -75,6 +76,23 @@ const CadenceSync = (() => {
   async function deleteAllCloudData(userId) {
     await client.from('events').delete().eq('user_id', userId);
     await client.from('settings').delete().eq('user_id', userId);
+  }
+
+  /* ---------- realtime (live cross-device updates) ---------- */
+  let channel = null;
+  // Pushes any insert/update/delete on this user's rows to onEvent/onSettings
+  // as it happens — including this device's own writes echoing back, which
+  // callers should treat as a harmless idempotent no-op.
+  function subscribeRealtime(userId, onEvent, onSettings) {
+    if (!configured) return;
+    unsubscribeRealtime();
+    channel = client.channel('cadence-' + userId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `user_id=eq.${userId}` }, onEvent)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `user_id=eq.${userId}` }, onSettings)
+      .subscribe();
+  }
+  function unsubscribeRealtime() {
+    if (channel) { client.removeChannel(channel); channel = null; }
   }
 
   /* ---------- outbox (pending writes, offline-safe) ---------- */
@@ -154,6 +172,7 @@ const CadenceSync = (() => {
     fetchAll, deleteAllCloudData,
     enqueueUpsertEvent, enqueueDeleteEvent, enqueueUpsertSettings,
     flush, pendingCount, peekOutbox, clearOutbox,
+    subscribeRealtime, unsubscribeRealtime,
     eventToRow, rowToEvent,
   };
 })();

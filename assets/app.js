@@ -849,11 +849,38 @@ async function onSignedIn(session){
   renderDashboard();
   setView(ui.view||'dashboard');
   CadenceSync.flush();
+  CadenceSync.subscribeRealtime(currentUserId, onRemoteEventChange, onRemoteSettingsChange);
 }
 function onSignedOut(){
   currentUserId=null;
   document.getElementById('authForm').reset();
   showAuthScreen();
+}
+
+// Live cross-device updates: a change made on another signed-in device (or
+// this one, echoing its own write back) arrives here and is folded straight
+// into local state — no manual refresh needed. Idempotent by id, so an
+// echo of our own just-made change is a harmless no-op re-render.
+function onRemoteEventChange(payload){
+  const {eventType,new:newRow,old:oldRow}=payload;
+  if(eventType==='DELETE'){
+    if(!oldRow||!oldRow.id)return;
+    state.events=state.events.filter(e=>e.id!==oldRow.id);
+  }else{
+    const ev=CadenceSync.rowToEvent(newRow);
+    const idx=state.events.findIndex(e=>e.id===ev.id);
+    if(idx===-1)state.events.push(ev); else state.events[idx]=ev;
+    state.events.sort((a,b)=>a.ts-b.ts);
+  }
+  save();
+  renderAll();
+}
+function onRemoteSettingsChange(payload){
+  const {eventType,new:newRow}=payload;
+  if(eventType==='DELETE'||!newRow)return;
+  state.goals=newRow.goals; state.audience=newRow.audience;
+  save();
+  renderAll();
 }
 
 async function boot(){

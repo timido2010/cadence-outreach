@@ -60,3 +60,23 @@ create policy "settings_update_own" on public.settings
   for update using (auth.uid() = user_id);
 
 grant select, insert, update on public.settings to authenticated;
+
+-- Turn on Realtime for both tables, so a change made on one device (e.g. a
+-- phone) pushes live to any other open, signed-in device (e.g. a desktop)
+-- without needing a manual refresh. Safe to re-run: only adds each table
+-- to the publication if it isn't already a member.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'events'
+  ) then
+    alter publication supabase_realtime add table public.events;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'settings'
+  ) then
+    alter publication supabase_realtime add table public.settings;
+  end if;
+end $$;

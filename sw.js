@@ -1,5 +1,5 @@
 /* Cadence service worker — cache the app shell for offline use. */
-const CACHE = 'cadence-v5';
+const CACHE = 'cadence-v6';
 const ASSETS = [
   './',
   './index.html',
