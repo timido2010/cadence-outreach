@@ -170,6 +170,15 @@ grant select, insert, update on public.settings to authenticated;
 (This is identical to the `supabase_schema.sql` file in the project folder —
 copying from here means you never have to go find that file yourself.)
 
+### How often do I need to re-run this?
+
+**Almost never.** This is not routine maintenance. It's only needed when a
+*new feature* requires a *new database structure* (a new table, or a new
+column on an existing one) — that's rare. Normal daily use of the app (logging
+calls, checking stats, editing goals) never touches this. If I ever add
+something that needs it, I'll tell you explicitly and hand you the updated
+script. Otherwise, ignore this section entirely.
+
 ### Where to find your Supabase keys (only needed once, already done)
 Settings (gear icon, bottom-left) → **API** → you'll see:
 - **Project URL**
@@ -200,6 +209,25 @@ silo** — there's no "team" or shared-data feature built into this app.
 - **A second person with their own tracking:** they'd create their **own
   separate account** (different email). Their data is completely invisible to
   yours and vice versa — it's not a shared workspace.
+
+---
+
+## "What if later I want to..."
+
+**...use my own domain instead of the github.io link?**
+Yes, easy. GitHub Pages supports custom domains. Tell me the domain you own,
+and I'll add one config file plus tell you the one DNS record to add at
+wherever you bought the domain (GoDaddy, Namecheap, etc. — I don't have
+access to your registrar, so that one step is yours). Live within a few
+hours of adding the record.
+
+**...switch the database from Supabase to Firebase?**
+Possible, but not a quick swap — Supabase and Firebase are different systems
+that don't speak the same language. I'd need to rewrite `assets/sync.js` (the
+one file that talks to the database) and recreate the schema/security rules
+for Firebase. Your screens, design, and workflow would stay identical —
+only that one connector changes. A real but contained job, doable whenever
+you want; today's choice doesn't lock you in.
 
 ---
 
