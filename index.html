@@ -1,0 +1,168 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1016" />
+<title>Cadence — Outreach Tracker</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<!-- HTML lives in index.html; app boots from assets/app.js at the end of body -->
+<div id="app">
+  <!-- ===== Top bar ===== -->
+  <header class="topbar glass">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div class="brand-text">
+        <span class="brand-name">Cadence</span>
+        <span class="brand-sub">Daily outreach</span>
+      </div>
+    </div>
+    <button id="dateBtn" class="date-pill" type="button" aria-label="Change active day">
+      <span data-icon="calendar"></span>
+      <span id="dateLabel">Today</span>
+    </button>
+  </header>
+
+  <main>
+    <!-- ============================================================= -->
+    <!-- DASHBOARD VIEW                                                 -->
+    <!-- ============================================================= -->
+    <section id="view-dashboard" class="view">
+      <!-- Audience selector -->
+      <div class="segment" role="group" aria-label="Audience type">
+        <button class="seg-btn" data-audience="seller" type="button">
+          <span data-icon="home"></span><span>Seller</span>
+        </button>
+        <button class="seg-btn" data-audience="buyer" type="button">
+          <span data-icon="key"></span><span>Buyer</span>
+        </button>
+        <button class="seg-btn" data-audience="landlord" type="button">
+          <span data-icon="building"></span><span>Landlord</span>
+        </button>
+      </div>
+
+      <!-- Primary action -->
+      <button id="newCallBtn" class="primary-action press" type="button">
+        <span data-icon="phone"></span>
+        <span class="pa-label">New Call</span>
+        <span class="pa-hint">Tap, then pick the result</span>
+      </button>
+
+      <!-- Bento grid -->
+      <div class="bento">
+        <!-- Funnel (signature) -->
+        <div class="card funnel-card" id="funnelCard">
+          <div class="card-head">
+            <h2>Today's funnel</h2>
+            <span class="card-sub" id="funnelAudienceLabel">Seller</span>
+          </div>
+          <div class="funnel" id="funnel"></div>
+        </div>
+
+        <!-- Goals -->
+        <div class="card goals-card">
+          <div class="card-head">
+            <h2>Goals</h2>
+            <button id="editGoalsBtn" class="ghost-btn" type="button" aria-label="Edit goals">
+              <span data-icon="sliders"></span>
+            </button>
+          </div>
+          <div id="goals"></div>
+        </div>
+
+        <!-- Follow-up actions -->
+        <div class="card followups-card">
+          <div class="card-head">
+            <h2>Follow-ups</h2>
+            <span class="card-sub">Later events</span>
+          </div>
+          <div class="followups" id="followups"></div>
+        </div>
+      </div>
+
+      <!-- Correction bar -->
+      <div class="correction-bar">
+        <button id="undoBtn" class="ghost-wide press" type="button" disabled>
+          <span data-icon="undo"></span><span>Undo</span>
+        </button>
+        <button id="adjustBtn" class="ghost-wide press" type="button">
+          <span data-icon="edit"></span><span>Correct totals</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- STATS VIEW                                                     -->
+    <!-- ============================================================= -->
+    <section id="view-stats" class="view" hidden>
+      <div class="segment small" role="group" aria-label="Time range" id="rangeSeg">
+        <button class="seg-btn" data-range="today" type="button">Today</button>
+        <button class="seg-btn" data-range="week" type="button">Week</button>
+        <button class="seg-btn" data-range="month" type="button">Month</button>
+        <button class="seg-btn" data-range="all" type="button">All</button>
+      </div>
+      <div class="segment small" role="group" aria-label="Audience filter" id="audFilterSeg">
+        <button class="seg-btn" data-filter="all" type="button">All</button>
+        <button class="seg-btn" data-filter="seller" type="button">Seller</button>
+        <button class="seg-btn" data-filter="buyer" type="button">Buyer</button>
+        <button class="seg-btn" data-filter="landlord" type="button">Landlord</button>
+      </div>
+
+      <div class="bento stats-bento" id="statTiles"></div>
+
+      <div class="card">
+        <div class="card-head"><h2>Stage conversion</h2><span class="card-sub" id="convFunnelLabel">Full funnel</span></div>
+        <div id="conversions"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Efficiency ratios</h2></div>
+        <div id="ratios" class="ratio-list"></div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- DATA VIEW                                                      -->
+    <!-- ============================================================= -->
+    <section id="view-data" class="view" hidden>
+      <div class="card">
+        <div class="card-head"><h2>Backup</h2><span class="card-sub">Keep your history safe</span></div>
+        <p class="muted-p">Everything is stored on this device. Export a copy before switching phones or clearing your browser.</p>
+        <div class="data-actions">
+          <button id="exportJson" class="ghost-wide press" type="button"><span data-icon="download"></span><span>Export JSON</span></button>
+          <button id="exportCsv" class="ghost-wide press" type="button"><span data-icon="table"></span><span>Export CSV</span></button>
+          <button id="importBtn" class="ghost-wide press" type="button"><span data-icon="upload"></span><span>Import JSON</span></button>
+          <input id="importFile" type="file" accept="application/json,.json" hidden />
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Recent activity</h2><span class="card-sub" id="logDateLabel">Today</span></div>
+        <div id="activityLog" class="activity-log"></div>
+      </div>
+      <div class="card danger-card">
+        <div class="card-head"><h2>Reset</h2></div>
+        <p class="muted-p">Delete every day and start over. Export first — this cannot be undone.</p>
+        <button id="resetBtn" class="danger-btn press" type="button">Erase all data</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== Bottom nav ===== -->
+  <nav class="tabbar glass">
+    <button class="tab" data-view="dashboard" type="button"><span data-icon="target"></span><span>Track</span></button>
+    <button class="tab" data-view="stats" type="button"><span data-icon="chart"></span><span>Stats</span></button>
+    <button class="tab" data-view="data" type="button"><span data-icon="database"></span><span>Data</span></button>
+  </nav>
+
+  <!-- ===== Sheet (bottom modal) ===== -->
+  <div id="sheet" class="sheet-backdrop" hidden>
+    <div class="sheet glass" role="dialog" aria-modal="true">
+      <div class="sheet-grab" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h3 id="sheetTitle">Result</h3>
+        <button id="sheetClose" class="ghost-btn" type="button" aria-label="Close"><span data-icon="x"></span></button>
+      </div>
+      <div id="sheetBody"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+<script src="assets/app.js"></script>
