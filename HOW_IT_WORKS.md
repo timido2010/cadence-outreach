@@ -212,6 +212,26 @@ silo** — there's no "team" or shared-data feature built into this app.
 
 ---
 
+## Is my data public? Can strangers use my app?
+
+**GitHub repo: public and viewable.** Anyone can see/copy every file, including
+`assets/config.js` (your real Supabase URL + publishable key in plain text).
+This is required for GitHub's free Pages hosting (private repos need a paid
+GitHub plan).
+
+**Your data: private.** Supabase's security rules (Row Level Security) mean a
+signed-in account only ever sees *its own* rows. Even someone who copies your
+code and points it at your same Supabase project cannot read your calls,
+meetings, or goals.
+
+**The real exposure:** since your Supabase URL/key are public, a stranger
+could sign up for their **own** account on your Supabase project (using your
+free-tier quota, never your data). Low real-world risk, but if you want it
+closed off, ask me to **disable public sign-ups** in Supabase — then only
+accounts you create yourself in the Supabase dashboard can log in.
+
+---
+
 ## "What if later I want to..."
 
 **...use my own domain instead of the github.io link?**
