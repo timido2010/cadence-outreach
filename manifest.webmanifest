@@ -1,7 +1,9 @@
 {
-  "name": "Cadence — Outreach Tracker",
+  "name": "Cadence — מעקב פעילות",
   "short_name": "Cadence",
-  "description": "Fast, mobile-first tracker for real estate outreach and conversion stats.",
+  "description": "מעקב מהיר אחר פעילות תיווך והמרות, מותאם לנייד.",
+  "lang": "he",
+  "dir": "rtl",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

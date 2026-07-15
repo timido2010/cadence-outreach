@@ -42,45 +42,45 @@ function paintIcons(root=document){
 const COUNTERS=['call','answered','qualified','meetingScheduled','meetingCompleted','signed'];
 
 const AUDIENCES={
-  seller:{label:'Seller'}, buyer:{label:'Buyer'}, landlord:{label:'Landlord'},
+  seller:{label:'מוכר'}, buyer:{label:'קונה'}, landlord:{label:'משכיר'},
 };
 
 // Call-result options per audience. Order = funnel depth; each records all prior stages.
 const CALL_RESULTS={
   seller:[
-    {key:'no_answer',   name:'No Answer',              desc:'Call +1',                                 deltas:{call:1}},
-    {key:'not_qual',    name:'Answered, Not Qualified',desc:'Call + Answered',                         deltas:{call:1,answered:1}},
-    {key:'qualified',   name:'Qualified Conversation', desc:'Call + Answered + Qualified',             deltas:{call:1,answered:1,qualified:1}},
-    {key:'meeting',     name:'Meeting Scheduled',      desc:'Full funnel through meeting',   tone:'gold',deltas:{call:1,answered:1,qualified:1,meetingScheduled:1}},
+    {key:'no_answer',   name:'לא ענו',                        desc:'שיחה +1',                        deltas:{call:1}},
+    {key:'not_qual',    name:'נענו, לא הייתה שיחה איכותית',   desc:'שיחה + נענו',                    deltas:{call:1,answered:1}},
+    {key:'qualified',   name:'שיחה איכותית',                 desc:'שיחה + נענו + איכותית',          deltas:{call:1,answered:1,qualified:1}},
+    {key:'meeting',     name:'נקבעה פגישה',                  desc:'משפך מלא עד פגישה',    tone:'gold',deltas:{call:1,answered:1,qualified:1,meetingScheduled:1}},
   ],
   buyer:[
-    {key:'no_answer',   name:'No Answer',              desc:'Call +1',                                 deltas:{call:1}},
-    {key:'not_qual',    name:'Answered, Not Qualified',desc:'Call + Answered',                         deltas:{call:1,answered:1}},
-    {key:'qualified',   name:'Qualified Conversation', desc:'Call + Answered + Qualified',             deltas:{call:1,answered:1,qualified:1}},
-    {key:'meeting',     name:'Meeting Scheduled',      desc:'Full funnel through meeting',   tone:'gold',deltas:{call:1,answered:1,qualified:1,meetingScheduled:1}},
+    {key:'no_answer',   name:'לא ענו',                        desc:'שיחה +1',                        deltas:{call:1}},
+    {key:'not_qual',    name:'נענו, לא הייתה שיחה איכותית',   desc:'שיחה + נענו',                    deltas:{call:1,answered:1}},
+    {key:'qualified',   name:'שיחה איכותית',                 desc:'שיחה + נענו + איכותית',          deltas:{call:1,answered:1,qualified:1}},
+    {key:'meeting',     name:'נקבעה פגישה',                  desc:'משפך מלא עד פגישה',    tone:'gold',deltas:{call:1,answered:1,qualified:1,meetingScheduled:1}},
   ],
   landlord:[
-    {key:'no_answer',   name:'No Answer',              desc:'Call +1',                                 deltas:{call:1}},
-    {key:'not_qual',    name:'Answered, Not Qualified',desc:'Call + Answered',                         deltas:{call:1,answered:1}},
-    {key:'qualified',   name:'Qualified Conversation', desc:'Call + Answered + Qualified',             deltas:{call:1,answered:1,qualified:1}},
-    {key:'agreement',   name:'Agreement Signed',       desc:'Full funnel through signing',   tone:'gold',deltas:{call:1,answered:1,qualified:1,signed:1}},
+    {key:'no_answer',   name:'לא ענו',                        desc:'שיחה +1',                        deltas:{call:1}},
+    {key:'not_qual',    name:'נענו, לא הייתה שיחה איכותית',   desc:'שיחה + נענו',                    deltas:{call:1,answered:1}},
+    {key:'qualified',   name:'שיחה איכותית',                 desc:'שיחה + נענו + איכותית',          deltas:{call:1,answered:1,qualified:1}},
+    {key:'agreement',   name:'נחתם הסכם תיווך',              desc:'משפך מלא עד חתימה',    tone:'gold',deltas:{call:1,answered:1,qualified:1,signed:1}},
   ],
 };
 
 // Later, out-of-call events. Shown only for the relevant audience.
 const FOLLOWUPS={
   seller:[
-    {key:'meeting_done', name:'Meeting Completed',        icon:'calcheck',  deltas:{meetingCompleted:1}},
-    {key:'exclusivity',  name:'Exclusivity Signed',       icon:'handshake', tone:'gold', deltas:{signed:1}},
-    {key:'manual_meet',  name:'Meeting Scheduled Manually',icon:'flag',     full:true,   deltas:{meetingScheduled:1}},
+    {key:'meeting_done', name:'פגישה התקיימה',        icon:'calcheck',  deltas:{meetingCompleted:1}},
+    {key:'exclusivity',  name:'נחתמה בלעדיות',        icon:'handshake', tone:'gold', deltas:{signed:1}},
+    {key:'manual_meet',  name:'נקבעה פגישה ידנית',    icon:'flag',      full:true,   deltas:{meetingScheduled:1}},
   ],
   buyer:[
-    {key:'meeting_done', name:'Meeting Completed',        icon:'calcheck',  deltas:{meetingCompleted:1}},
-    {key:'brokerage',    name:'Brokerage Agreement Signed',icon:'handshake',tone:'gold', deltas:{signed:1}},
-    {key:'manual_meet',  name:'Meeting Scheduled Manually',icon:'flag',     full:true,   deltas:{meetingScheduled:1}},
+    {key:'meeting_done', name:'פגישה התקיימה',        icon:'calcheck',  deltas:{meetingCompleted:1}},
+    {key:'brokerage',    name:'נחתם הסכם תיווך',      icon:'handshake', tone:'gold', deltas:{signed:1}},
+    {key:'manual_meet',  name:'נקבעה פגישה ידנית',    icon:'flag',      full:true,   deltas:{meetingScheduled:1}},
   ],
   landlord:[
-    {key:'brokerage',    name:'Brokerage Agreement Signed',icon:'handshake',tone:'gold', full:true, deltas:{signed:1}},
+    {key:'brokerage',    name:'נחתם הסכם תיווך',      icon:'handshake', tone:'gold', full:true, deltas:{signed:1}},
   ],
 };
 
@@ -92,12 +92,12 @@ const FUNNELS={
   all:['call','answered','qualified','meetingScheduled','meetingCompleted','signed'],
 };
 const STAGE_NAMES={
-  call:'Calls', answered:'Answered', qualified:'Qualified', meetingScheduled:'Meetings scheduled',
-  meetingCompleted:'Meetings completed', signed:'Signed',
+  call:'שיחות', answered:'נענו', qualified:'שיחות איכותיות', meetingScheduled:'פגישות שנקבעו',
+  meetingCompleted:'פגישות שהתקיימו', signed:'הסכמים שנחתמו',
 };
 const STAGE_SHORT={
-  call:'Call', answered:'Answered', qualified:'Qualified', meetingScheduled:'Meeting set',
-  meetingCompleted:'Met', signed:'Signed',
+  call:'שיחה', answered:'נענו', qualified:'איכותית', meetingScheduled:'פגישה נקבעה',
+  meetingCompleted:'פגישה התקיימה', signed:'נחתם',
 };
 
 /* ---------- State / persistence ---------- */
@@ -122,17 +122,17 @@ function loadState(){
     };
   }catch(e){ console.warn('load failed',e); return structuredClone(DEFAULT_STATE); }
 }
-function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ toast('Storage full — export a backup'); } }
+function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ toast('האחסון מלא — ייצאו גיבוי'); } }
 
 /* ---------- Date helpers (local time) ---------- */
 function todayKey(){ return keyOf(new Date()); }
 function keyOf(d){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
 function parseKey(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d); }
 function humanDate(k){
-  if(k===todayKey())return 'Today';
+  if(k===todayKey())return 'היום';
   const y=new Date(); y.setDate(y.getDate()-1);
-  if(k===keyOf(y))return 'Yesterday';
-  return parseKey(k).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  if(k===keyOf(y))return 'אתמול';
+  return parseKey(k).toLocaleDateString('he-IL',{weekday:'short',month:'short',day:'numeric'});
 }
 // Monday-start week containing `ref`.
 function weekStart(ref){ const d=new Date(ref); const dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); d.setHours(0,0,0,0); return d; }
@@ -171,7 +171,7 @@ function undoLast(){
   if(!state.events.length)return;
   const ev=state.events.pop(); save();
   renderDashboard();
-  toast(`Undone: ${ev.label}`,'undo');
+  toast(`בוטל: ${ev.label}`,'undo');
 }
 
 /* ---------- Toast ---------- */
@@ -245,8 +245,8 @@ function renderGoals(){
   // Goals are global for the day (all audiences combined).
   const c=dayCounts(ui.activeDate,null);
   const rows=[
-    {key:'call', name:'Calls', val:c.call, goal:state.goals.call},
-    {key:'meetingCompleted', name:'Meetings completed', val:c.meetingCompleted, goal:state.goals.meetingCompleted},
+    {key:'call', name:'שיחות', val:c.call, goal:state.goals.call},
+    {key:'meetingCompleted', name:'פגישות שהתקיימו', val:c.meetingCompleted, goal:state.goals.meetingCompleted},
   ];
   document.getElementById('goals').innerHTML=rows.map(r=>{
     const pct= r.goal>0 ? Math.min(r.val/r.goal*100,100) : 0;
@@ -255,7 +255,7 @@ function renderGoals(){
     return `<div class="goal ${done?'done':''}">
       <div class="goal-top">
         <span class="goal-name">${r.name}</span>
-        <span class="goal-nums">${r.val} <span class="goal-goal">/ ${r.goal}</span></span>
+        <span class="goal-nums" dir="ltr">${r.val} <span class="goal-goal">/ ${r.goal}</span></span>
       </div>
       <div class="goal-bar"><i style="width:${pct}%;background:${color}"></i></div>
     </div>`;
@@ -282,7 +282,7 @@ function closeSheet(){ sheet.hidden=true; sheetBody.innerHTML=''; }
 
 function openCallSheet(){
   const results=CALL_RESULTS[state.audience];
-  openSheet(`${AUDIENCES[state.audience].label} — call result`);
+  openSheet(`${AUDIENCES[state.audience].label} — תוצאת שיחה`);
   sheetBody.innerHTML=`<div class="result-grid">${results.map((r,i)=>
     `<button class="result-btn press" data-result="${r.key}" ${r.tone?`data-tone="${r.tone}"`:''} type="button">
       <span class="result-rank">${i+1}</span>
@@ -302,23 +302,23 @@ function openCallSheet(){
 
 function openAdjustSheet(){
   const stages=FUNNELS[state.audience];
-  openSheet(`Correct totals — ${AUDIENCES[state.audience].label}`);
+  openSheet(`תיקון סכומים — ${AUDIENCES[state.audience].label}`);
   const base=dayCounts(ui.activeDate,state.audience);
   const working={...base};
   const editingOther= ui.activeDate!==todayKey();
   sheetBody.innerHTML=`
-    ${editingOther?`<div class="editing-banner"><span data-icon="edit"></span>Editing ${humanDate(ui.activeDate)}</div>`:''}
-    <p class="muted-p">Nudge a stage to match reality. Changes are logged so you can still undo.</p>
+    ${editingOther?`<div class="editing-banner"><span data-icon="edit"></span>עריכת ${humanDate(ui.activeDate)}</div>`:''}
+    <p class="muted-p">התאימו שלב כדי לשקף את המציאות. השינויים נרשמים כך שתמיד אפשר לבטל.</p>
     <div id="adjRows">${stages.map(st=>`
       <div class="adj-row" data-stage="${st}">
         <span class="adj-name">${STAGE_NAMES[st]}</span>
         <div class="adj-stepper">
-          <button class="step-btn" data-dir="-1" type="button" aria-label="decrease ${STAGE_NAMES[st]}">−</button>
+          <button class="step-btn" data-dir="-1" type="button" aria-label="הפחתת ${STAGE_NAMES[st]}">−</button>
           <span class="adj-count">${working[st]}</span>
-          <button class="step-btn" data-dir="1" type="button" aria-label="increase ${STAGE_NAMES[st]}">+</button>
+          <button class="step-btn" data-dir="1" type="button" aria-label="הוספת ${STAGE_NAMES[st]}">+</button>
         </div>
       </div>`).join('')}</div>
-    <button class="sheet-cta press" id="adjSave" type="button">Save corrections</button>`;
+    <button class="sheet-cta press" id="adjSave" type="button">שמירת תיקונים</button>`;
   paintIcons(sheetBody);
   sheetBody.querySelectorAll('.adj-row').forEach(row=>{
     const st=row.dataset.stage, out=row.querySelector('.adj-count');
@@ -332,23 +332,23 @@ function openAdjustSheet(){
     stages.forEach(st=>{ const d=working[st]-base[st]; if(d!==0){ deltas[st]=d; any=true; } });
     if(any){
       state.events.push({ id:uid(), ts:Date.now(), dateKey:ui.activeDate,
-        audience:state.audience, kind:'adjust', label:'Manual correction', deltas });
-      save(); renderDashboard(); toast('Totals corrected','good');
+        audience:state.audience, kind:'adjust', label:'תיקון ידני', deltas });
+      save(); renderDashboard(); toast('הסכומים תוקנו','good');
     }
     closeSheet();
   });
 }
 
 function openDateSheet(){
-  openSheet('Choose a day');
+  openSheet('בחירת יום');
   const y=new Date(); y.setDate(y.getDate()-1);
   sheetBody.innerHTML=`
     <input class="date-field" type="date" id="datePick" value="${ui.activeDate}" max="${todayKey()}" />
     <div class="date-quick">
-      <button class="ghost-wide press" data-day="${todayKey()}" type="button">Today</button>
-      <button class="ghost-wide press" data-day="${keyOf(y)}" type="button">Yesterday</button>
+      <button class="ghost-wide press" data-day="${todayKey()}" type="button">היום</button>
+      <button class="ghost-wide press" data-day="${keyOf(y)}" type="button">אתמול</button>
     </div>
-    <button class="sheet-cta press" id="dateGo" type="button">Open this day</button>`;
+    <button class="sheet-cta press" id="dateGo" type="button">מעבר ליום זה</button>`;
   const pick=document.getElementById('datePick');
   sheetBody.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{ pick.value=b.dataset.day; }));
   document.getElementById('dateGo').addEventListener('click',()=>{
@@ -358,11 +358,11 @@ function openDateSheet(){
 }
 
 function openGoalsSheet(){
-  openSheet('Daily goals');
+  openSheet('יעדים יומיים');
   sheetBody.innerHTML=`
-    <p class="muted-p">One target for the whole day, across every audience.</p>
+    <p class="muted-p">יעד אחד לכל היום, משותף לכל סוגי הקהל.</p>
     <div class="adj-row">
-      <span class="adj-name">Calls per day</span>
+      <span class="adj-name">שיחות ליום</span>
       <div class="adj-stepper">
         <button class="step-btn" data-g="call" data-dir="-1" type="button">−</button>
         <span class="adj-count" id="gcall">${state.goals.call}</span>
@@ -370,14 +370,14 @@ function openGoalsSheet(){
       </div>
     </div>
     <div class="adj-row">
-      <span class="adj-name">Meetings completed per day</span>
+      <span class="adj-name">פגישות שהתקיימו ליום</span>
       <div class="adj-stepper">
         <button class="step-btn" data-g="meetingCompleted" data-dir="-1" type="button">−</button>
         <span class="adj-count" id="gmeet">${state.goals.meetingCompleted}</span>
         <button class="step-btn" data-g="meetingCompleted" data-dir="1" type="button">+</button>
       </div>
     </div>
-    <button class="sheet-cta press" id="goalsSave" type="button">Save goals</button>`;
+    <button class="sheet-cta press" id="goalsSave" type="button">שמירת יעדים</button>`;
   const draft={...state.goals};
   sheetBody.querySelectorAll('.step-btn').forEach(b=>b.addEventListener('click',()=>{
     const g=b.dataset.g, step= g==='call'?1:1;
@@ -385,7 +385,7 @@ function openGoalsSheet(){
     document.getElementById(g==='call'?'gcall':'gmeet').textContent=draft[g];
   }));
   document.getElementById('goalsSave').addEventListener('click',()=>{
-    state.goals=draft; save(); renderDashboard(); toast('Goals updated'); closeSheet();
+    state.goals=draft; save(); renderDashboard(); toast('היעדים עודכנו'); closeSheet();
   });
 }
 
@@ -405,13 +405,13 @@ function renderStats(){
   const meetCompRate=fmtPct(c.meetingCompleted,c.meetingScheduled);
 
   const tiles=[
-    {label:'Total calls', icon:'phone', val:c.call, cls:'accent'},
-    {label:'Answer rate', icon:'percent', val: answerRate===null?'—':answerRate+'%', sub: answerRate===null?'Not enough data':`${c.answered} of ${c.call}`, cls:'accent', small:answerRate===null},
-    {label:'Qualified talks', icon:'users', val:c.qualified},
-    {label:'Meetings scheduled', icon:'calendar', val:c.meetingScheduled},
-    {label:'Meetings completed', icon:'calcheck', val:c.meetingCompleted},
-    {label:'Signed agreements', icon:'handshake', val:c.signed, cls:'gold'},
-    {label:'Meeting completion', icon:'percent', val: meetCompRate===null?'—':meetCompRate+'%', sub: meetCompRate===null?'Not enough data':`${c.meetingCompleted} of ${c.meetingScheduled}`, span2:true, cls:'accent', small:meetCompRate===null},
+    {label:'סה"כ שיחות', icon:'phone', val:c.call, cls:'accent'},
+    {label:'אחוז מענה', icon:'percent', val: answerRate===null?'—':answerRate+'%', sub: answerRate===null?'אין מספיק נתונים':`${c.answered} מתוך ${c.call}`, cls:'accent', small:answerRate===null},
+    {label:'שיחות איכותיות', icon:'users', val:c.qualified},
+    {label:'פגישות שנקבעו', icon:'calendar', val:c.meetingScheduled},
+    {label:'פגישות שהתקיימו', icon:'calcheck', val:c.meetingCompleted},
+    {label:'הסכמים שנחתמו', icon:'handshake', val:c.signed, cls:'gold'},
+    {label:'אחוז השלמת פגישות', icon:'percent', val: meetCompRate===null?'—':meetCompRate+'%', sub: meetCompRate===null?'אין מספיק נתונים':`${c.meetingCompleted} מתוך ${c.meetingScheduled}`, span2:true, cls:'accent', small:meetCompRate===null},
   ];
   document.getElementById('statTiles').innerHTML=tiles.map(t=>
     `<div class="tile ${t.cls||''} ${t.span2?'span2':''}">
@@ -435,13 +435,13 @@ function buildTrend(){
   if(ui.range==='all'){
     const start=weekStart(now);
     for(let i=11;i>=0;i--){ const s=new Date(start); s.setDate(s.getDate()-i*7); const e=new Date(s); e.setDate(e.getDate()+7);
-      buckets.push({label:`${s.getMonth()+1}/${s.getDate()}`, from:s, to:e}); }
-    document.getElementById('trendLabel').textContent='Last 12 weeks';
+      buckets.push({label:`${s.getDate()}/${s.getMonth()+1}`, from:s, to:e}); }
+    document.getElementById('trendLabel').textContent='12 השבועות האחרונים';
   }else{
     const days= ui.range==='month'?30:7;
     for(let i=days-1;i>=0;i--){ const d=new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
       buckets.push({label:String(d.getDate()), dk:keyOf(d)}); }
-    document.getElementById('trendLabel').textContent=`Last ${days} days`;
+    document.getElementById('trendLabel').textContent=`${days} הימים האחרונים`;
   }
   buckets.forEach(b=>{
     let calls=0, meets=0;
@@ -459,12 +459,12 @@ function renderTrend(){
   const el=document.getElementById('trendChart');
   const data=buildTrend();
   const total=data.reduce((s,b)=>s+b.calls,0);
-  if(total===0){ el.classList.remove('dense'); el.innerHTML='<div class="log-empty">Not enough data yet.</div>'; return; }
+  if(total===0){ el.classList.remove('dense'); el.innerHTML='<div class="log-empty">עדיין אין מספיק נתונים.</div>'; return; }
   const maxC=Math.max(1,...data.map(d=>d.calls));
   el.classList.toggle('dense', data.length>10);
   el.innerHTML=data.map(b=>{
     const h=(b.calls/maxC*100).toFixed(1);
-    return `<div class="tcol" title="${b.label}: ${b.calls} calls, ${b.meets} meetings completed">
+    return `<div class="tcol" title="${b.label}: ${b.calls} שיחות, ${b.meets} פגישות שהתקיימו">
       <div class="tbar-wrap">
         ${b.meets>0?`<span class="tdot"></span>`:''}
         <div class="tbar" style="height:${h}%"></div>
@@ -476,15 +476,17 @@ function renderTrend(){
 
 function renderConversions(c){
   const funnel=FUNNELS[ui.filter] || FUNNELS.all;
-  document.getElementById('convFunnelLabel').textContent= ui.filter==='all'?'Full funnel':AUDIENCES[ui.filter].label;
+  document.getElementById('convFunnelLabel').textContent= ui.filter==='all'?'משפך מלא':AUDIENCES[ui.filter].label;
   const rows=[];
   for(let i=0;i<funnel.length-1;i++){
     const from=funnel[i], to=funnel[i+1];
     const pct=fmtPct(c[to],c[from]);
+    // RTL: 'from' is logical-first so it sits on the right; the arrow points
+    // left toward 'to', matching the funnel's right-to-left progression.
     rows.push(`<div class="conv">
       <div class="conv-top">
-        <span class="conv-stages">${STAGE_SHORT[from]} → ${STAGE_SHORT[to]}</span>
-        <span class="conv-pct">${pct===null?'<span style="color:var(--muted-2);font-weight:600">Not enough data</span>':pct+'%'}</span>
+        <span class="conv-stages">${STAGE_SHORT[from]} ← ${STAGE_SHORT[to]}</span>
+        <span class="conv-pct">${pct===null?'<span style="color:var(--muted-2);font-weight:600">אין מספיק נתונים</span>':pct+'%'}</span>
       </div>
       <div class="conv-bar"><i style="width:${pct===null?0:Math.min(pct,100)}%"></i></div>
     </div>`);
@@ -495,14 +497,14 @@ function renderConversions(c){
 function renderRatios(c){
   function ratioLine(name, num, den, unit){
     const r=fmtRatio(num,den);
-    if(r===null)return {name, val:'Not enough data', nd:true};
+    if(r===null)return {name, val:'אין מספיק נתונים', nd:true};
     const shown= r>=10 ? Math.round(r) : (Math.round(r*10)/10);
     return {name, val:`${shown} ${unit}`, nd:false};
   }
   const lines=[
-    ratioLine('Calls per scheduled meeting', c.call, c.meetingScheduled, 'calls'),
-    ratioLine('Calls per signed agreement', c.call, c.signed, 'calls'),
-    ratioLine('Meetings per signed agreement', c.meetingCompleted, c.signed, 'meetings'),
+    ratioLine('שיחות לכל פגישה שנקבעה', c.call, c.meetingScheduled, 'שיחות'),
+    ratioLine('שיחות לכל הסכם שנחתם', c.call, c.signed, 'שיחות'),
+    ratioLine('פגישות לכל הסכם שנחתם', c.meetingCompleted, c.signed, 'פגישות'),
   ];
   document.getElementById('ratios').innerHTML=lines.map(l=>
     `<div class="ratio">
@@ -518,9 +520,9 @@ function renderData(){
   document.getElementById('logDateLabel').textContent=humanDate(ui.activeDate);
   const evs=state.events.filter(e=>e.dateKey===ui.activeDate).slice().sort((a,b)=>b.ts-a.ts);
   const box=document.getElementById('activityLog');
-  if(!evs.length){ box.innerHTML=`<div class="log-empty">No activity logged for ${humanDate(ui.activeDate).toLowerCase()}.</div>`; return; }
+  if(!evs.length){ box.innerHTML=`<div class="log-empty">לא נרשמה פעילות עבור ${humanDate(ui.activeDate)}.</div>`; return; }
   box.innerHTML=evs.map(e=>{
-    const t=new Date(e.ts).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+    const t=new Date(e.ts).toLocaleTimeString('he-IL',{hour:'numeric',minute:'2-digit'});
     const dotCls= e.kind==='adjust'?'adjust':(e.deltas.signed?'gold':'');
     const parts=Object.entries(e.deltas).map(([k,v])=>`${v>0?'+':''}${v} ${STAGE_SHORT[k]||k}`).join(' · ');
     return `<div class="log-item">
@@ -544,7 +546,7 @@ function download(filename, text, type){
 }
 function exportJSON(){
   download(`cadence-backup-${todayKey()}.json`, JSON.stringify(state,null,2), 'application/json');
-  toast('Backup exported');
+  toast('הגיבוי יוצא');
 }
 function exportCSV(){
   const head=['date','time','audience','kind','label',...COUNTERS];
@@ -556,7 +558,7 @@ function exportCSV(){
     rows.push(cells.join(','));
   });
   download(`cadence-activity-${todayKey()}.csv`, rows.join('\n'), 'text/csv');
-  toast('CSV exported');
+  toast('קובץ CSV יוצא');
 }
 function importJSON(file){
   const reader=new FileReader();
@@ -564,11 +566,11 @@ function importJSON(file){
     try{
       const s=JSON.parse(reader.result);
       if(!s||!Array.isArray(s.events))throw new Error('bad file');
-      if(!confirm(`Import ${s.events.length} events? This replaces your current data.`))return;
+      if(!confirm(`לייבא ${s.events.length} רשומות? פעולה זו תחליף את הנתונים הנוכחיים.`))return;
       state={ events:s.events, goals:Object.assign({call:25,meetingCompleted:3},s.goals||{}),
         audience:AUDIENCES[s.audience]?s.audience:'seller' };
-      save(); renderAll(); toast('Backup restored');
-    }catch(e){ toast('Could not read that file'); }
+      save(); renderAll(); toast('הגיבוי שוחזר');
+    }catch(e){ toast('לא ניתן לקרוא את הקובץ'); }
   };
   reader.readAsText(file);
 }
@@ -621,8 +623,8 @@ function wire(){
   document.getElementById('importBtn').addEventListener('click',()=>document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change',e=>{ if(e.target.files[0])importJSON(e.target.files[0]); e.target.value=''; });
   document.getElementById('resetBtn').addEventListener('click',()=>{
-    if(confirm('Erase ALL data on this device? Export a backup first — this cannot be undone.')){
-      state=structuredClone(DEFAULT_STATE); save(); ui.activeDate=todayKey(); renderAll(); toast('All data erased','undo');
+    if(confirm('למחוק את כל הנתונים במכשיר? ייצאו גיבוי קודם — פעולה זו אינה הפיכה.')){
+      state=structuredClone(DEFAULT_STATE); save(); ui.activeDate=todayKey(); renderAll(); toast('כל הנתונים נמחקו','undo');
     }
   });
 
@@ -643,6 +645,8 @@ if('serviceWorker' in navigator && location.protocol.startsWith('http')){
 }
 
 /* boot */
+document.documentElement.lang='he';
+document.documentElement.dir='rtl';
 renderDashboard();
 setView('dashboard');
 wire();
