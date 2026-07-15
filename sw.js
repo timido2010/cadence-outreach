@@ -1,16 +1,22 @@
 /* Cadence service worker — cache the app shell for offline use. */
-const CACHE = 'cadence-v2';
+const CACHE = 'cadence-v3';
 const ASSETS = [
   './',
   './index.html',
-  './assets/styles.css?v=2',
-  './assets/app.js?v=2',
+  './assets/styles.css',
+  './assets/app.js',
   './assets/icon.svg',
   './manifest.webmanifest',
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // {cache:'reload'} forces fresh copies from the network on each new version,
+  // so bumping CACHE above is all it takes to push an update to installed apps.
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (e) => {

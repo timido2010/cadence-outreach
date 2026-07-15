@@ -27,6 +27,10 @@
   --maxw:520px;
 }
 *{box-sizing:border-box}
+/* The [hidden] attribute must always win over layout display rules
+   (e.g. .sheet-backdrop{display:flex}), or hidden overlays stay on top
+   and swallow taps. */
+[hidden]{display:none!important}
 html,body{margin:0;padding:0}
 body{
   background:
@@ -51,12 +55,19 @@ svg{display:block}
   min-height:100vh;
 }
 
-/* glass utility */
+/* glass utility — solid base first (crisp everywhere), light blur as an
+   enhancement only where it's cheap. Heavy backdrop blur was dropped because
+   it renders slow/washed-out on some GPUs. */
 .glass{
-  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
-  backdrop-filter:blur(18px) saturate(1.2);
-  -webkit-backdrop-filter:blur(18px) saturate(1.2);
+  background:linear-gradient(180deg,rgba(24,32,43,.92),rgba(16,22,30,.92));
   border:1px solid var(--border);
+}
+@supports (backdrop-filter:blur(8px)){
+  .glass{
+    background:linear-gradient(180deg,rgba(24,32,43,.72),rgba(16,22,30,.72));
+    backdrop-filter:blur(9px) saturate(1.15);
+    -webkit-backdrop-filter:blur(9px) saturate(1.15);
+  }
 }
 
 /* ===== Top bar ===== */
@@ -143,7 +154,6 @@ svg{display:block}
 .card{
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-soft);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
 }
 .funnel-card{grid-column:1 / -1}
 .followups-card{grid-column:1 / -1}
