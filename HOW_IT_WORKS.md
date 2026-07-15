@@ -34,19 +34,43 @@ your desktop, sign in with the same account on both — same data everywhere.
 
 ## What you do vs. what I do
 
-**You:**
-- Open the link above and use the app (log calls, check stats).
-- Sign in once per device with your one account (email + password you chose).
-- Ask me for changes/features when you want something different.
+**Day to day, using the app:** nothing to deploy. Just open the link and use it.
 
-**Me (whenever you ask for a change):**
-- Edit the code.
-- Save it to GitHub ("commit" + "push" — see below).
-- GitHub Pages automatically rebuilds your live site within about a minute.
-- I test it and tell you when it's ready.
+**When you ask me to change something:** I edit the code and publish it for
+you (see "Commit and push" below) — that's still the default, same as before.
 
-You never need to run a command, open a terminal, or touch GitHub/Supabase's
-technical settings — unless it's a one-time setup step like the one below.
+**If you want to publish changes yourself** (e.g. you edited a file, or just
+don't want to wait on me): double-click **`deploy.bat`** in this project
+folder. That's your "commit + deploy" button — see the section below.
+
+You never need to touch GitHub's or Supabase's technical settings day-to-day
+— only the one-time SQL step described further down, and only when I
+explicitly hand you a new script.
+
+---
+
+## Publishing changes yourself — `deploy.bat`
+
+This project now has a file called **`deploy.bat`** sitting in the main
+project folder, right next to `index.html`. This is your equivalent of the
+"deploy" step you had in the client portal project. To use it:
+
+1. Double-click **`deploy.bat`**. A black command window opens.
+2. It asks you to describe what changed — type a short note (e.g. "fixed typo")
+   or just press **Enter** to skip.
+3. It automatically saves the changes (**commit**) and uploads them (**push**).
+4. When it says **"Done!"**, your live site will update within about a minute:
+   **https://timido2010.github.io/cadence-outreach/** (hard-refresh once to see it: `Ctrl+Shift+R`)
+
+If it says **"Nothing to commit"**, that just means nothing in the project
+folder actually changed — nothing to publish, totally normal.
+
+If it says **"Push failed"**, check your internet connection and double-click
+it again. If it keeps failing, send me a screenshot of the black window.
+
+You do **not** need this file for day-to-day use of the app — only if you (or
+I, working outside a chat with you) edit files directly and need to publish
+them.
 
 ---
 
@@ -68,20 +92,83 @@ first time after any update, so your browser doesn't show an old cached copy).
 
 ## The one-time Supabase setup
 
-You already have a Supabase project. If I ever hand you a **new or updated**
-`supabase_schema.sql` file, here's exactly what to do with it — this is the
-*only* technical step that's ever on you, and only when I explicitly ask for it:
+You already have a Supabase project. If I ever say "re-run the SQL script,"
+here's exactly what that means — this is the *only* technical step that's
+ever on you, and only when I explicitly ask for it:
 
 1. Go to **supabase.com** → log in → open your project.
 2. In the left sidebar, click **SQL Editor**.
 3. Click **New query**.
-4. Open the `supabase_schema.sql` file in this project, select all its text, copy it.
-5. Paste it into the SQL Editor box.
-6. Click **Run** (or press Ctrl+Enter).
-7. You should see a green "Success" message. That's it — done.
+4. Copy the entire box below (click inside it, Ctrl+A, Ctrl+C) and paste it into the SQL Editor.
+5. Click **Run** (or press Ctrl+Enter).
+6. You should see a green "Success" message. That's it — done.
 
-It's safe to run this same script again if I ever ask — it won't duplicate
+It's safe to run this same script again any time I ask — it won't duplicate
 anything or break existing data.
+
+```sql
+-- Cadence — Supabase schema
+-- Run this once in your Supabase project's SQL Editor (Dashboard → SQL Editor → New query).
+-- Creates two tables, scoped to a single authenticated user via Row Level Security.
+
+create table if not exists public.events (
+  id           uuid primary key,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  ts           bigint not null,        -- epoch millis, matches the app's event.ts
+  date_key     text not null,          -- 'YYYY-MM-DD', the tracking day this event belongs to
+  audience     text not null,          -- 'seller' | 'buyer' | 'landlord'
+  kind         text not null,          -- 'call' | 'followup' | 'adjust'
+  label        text not null,
+  deltas       jsonb not null,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists events_user_id_idx on public.events(user_id);
+create index if not exists events_user_date_idx on public.events(user_id, date_key);
+
+alter table public.events enable row level security;
+
+drop policy if exists "events_select_own" on public.events;
+drop policy if exists "events_insert_own" on public.events;
+drop policy if exists "events_update_own" on public.events;
+drop policy if exists "events_delete_own" on public.events;
+
+create policy "events_select_own" on public.events
+  for select using (auth.uid() = user_id);
+create policy "events_insert_own" on public.events
+  for insert with check (auth.uid() = user_id);
+create policy "events_update_own" on public.events
+  for update using (auth.uid() = user_id);
+create policy "events_delete_own" on public.events
+  for delete using (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.events to authenticated;
+
+create table if not exists public.settings (
+  user_id       uuid primary key references auth.users(id) on delete cascade,
+  goals         jsonb not null default '{"call":25,"meetingCompleted":3}'::jsonb,
+  audience      text not null default 'seller',
+  updated_at    timestamptz not null default now()
+);
+
+alter table public.settings enable row level security;
+
+drop policy if exists "settings_select_own" on public.settings;
+drop policy if exists "settings_insert_own" on public.settings;
+drop policy if exists "settings_update_own" on public.settings;
+
+create policy "settings_select_own" on public.settings
+  for select using (auth.uid() = user_id);
+create policy "settings_insert_own" on public.settings
+  for insert with check (auth.uid() = user_id);
+create policy "settings_update_own" on public.settings
+  for update using (auth.uid() = user_id);
+
+grant select, insert, update on public.settings to authenticated;
+```
+
+(This is identical to the `supabase_schema.sql` file in the project folder —
+copying from here means you never have to go find that file yourself.)
 
 ### Where to find your Supabase keys (only needed once, already done)
 Settings (gear icon, bottom-left) → **API** → you'll see:
@@ -101,6 +188,38 @@ first time is what you use on every device to see the same data.
 
 If you ever forget your password, tell me and I'll walk you through Supabase's
 reset flow (I still won't type it for you — just guide you).
+
+### How many accounts / users can I have?
+
+Technically up to 50,000 (Supabase's free-tier limit) — effectively unlimited
+for personal use. But important: **every account is a separate, private
+silo** — there's no "team" or shared-data feature built into this app.
+
+- **Same person, two devices (phone + desktop):** use **one account** — that's
+  the normal case, already fully supported.
+- **A second person with their own tracking:** they'd create their **own
+  separate account** (different email). Their data is completely invisible to
+  yours and vice versa — it's not a shared workspace.
+
+---
+
+## Starting fresh — deleting test/practice data
+
+**Easiest way — inside the app:**
+1. Open the app → **נתונים** (Data) tab.
+2. Scroll to the **איפוס** (Reset) card.
+3. Tap **מחיקת כל הנתונים**.
+4. Confirm.
+
+This deletes everything on **both** your device and your Supabase cloud
+database in one step — the app is built to do both together, so nothing gets
+left behind to reappear later.
+
+**Alternative — directly in Supabase** (only if the button above ever fails):
+1. Go to **supabase.com** → your project → **Table Editor** (left sidebar).
+2. Click the **events** table → select all rows → **Delete**.
+3. Click the **settings** table → select all rows → **Delete**.
+4. Refresh the app — it'll start clean the next time you sign in.
 
 ---
 
