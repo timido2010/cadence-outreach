@@ -91,14 +91,28 @@ const FUNNELS={
   landlord:['call','answered','qualified','signed'],
   all:['call','answered','qualified','meetingScheduled','meetingCompleted','signed'],
 };
+// Stage conversion section (Stats): sales-performance steps only, as
+// explicit (from, to) pairs rather than a plain stage sequence — this lets
+// us skip the meetingScheduled → meetingCompleted step (attendance, not a
+// sales conversion; shown separately as the "אחוז השלמת פגישות" tile) while
+// still ending on meetingCompleted → signed for audiences with a meeting step.
+const CONV_STEPS={
+  seller:[['call','answered'],['answered','qualified'],['qualified','meetingScheduled'],['meetingCompleted','signed']],
+  buyer:[['call','answered'],['answered','qualified'],['qualified','meetingScheduled'],['meetingCompleted','signed']],
+  landlord:[['call','answered'],['answered','qualified'],['qualified','signed']],
+  all:[['call','answered'],['answered','qualified'],['qualified','meetingScheduled'],['meetingCompleted','signed']],
+};
 const STAGE_NAMES={
   call:'שיחות', answered:'נענו', qualified:'שיחות איכותיות', meetingScheduled:'פגישות שנקבעו',
   meetingCompleted:'פגישות שהתקיימו', signed:'הסכמים שנחתמו',
 };
 const STAGE_SHORT={
-  call:'שיחה', answered:'נענו', qualified:'איכותית', meetingScheduled:'פגישה נקבעה',
+  call:'שיחה', answered:'נענו', qualified:'שיחה איכותית', meetingScheduled:'פגישה נקבעה',
   meetingCompleted:'פגישה התקיימה', signed:'נחתם',
 };
+// "Signed" reads differently per audience (exclusivity vs. brokerage
+// agreement) — used only in the Stats conversion section's labels.
+const SIGNED_SHORT={ seller:'נחתמה בלעדיות', buyer:'נחתם הסכם תיווך', landlord:'נחתם הסכם תיווך', all:'נחתם' };
 
 /* ---------- State / persistence ---------- */
 const STORAGE_KEY='cadence.v1';
@@ -530,22 +544,22 @@ function renderTrend(){
 }
 
 function renderConversions(c){
-  const funnel=FUNNELS[ui.filter] || FUNNELS.all;
+  const steps=CONV_STEPS[ui.filter] || CONV_STEPS.all;
   document.getElementById('convFunnelLabel').textContent= ui.filter==='all'?'משפך מלא':AUDIENCES[ui.filter].label;
-  const rows=[];
-  for(let i=0;i<funnel.length-1;i++){
-    const from=funnel[i], to=funnel[i+1];
+  const signedLabel=SIGNED_SHORT[ui.filter]||SIGNED_SHORT.all;
+  const rows=steps.map(([from,to])=>{
     const pct=fmtPct(c[to],c[from]);
+    const toLabel = to==='signed' ? signedLabel : STAGE_SHORT[to];
     // RTL: 'from' is logical-first so it sits on the right; the arrow points
     // left toward 'to', matching the funnel's right-to-left progression.
-    rows.push(`<div class="conv">
+    return `<div class="conv">
       <div class="conv-top">
-        <span class="conv-stages">${STAGE_SHORT[from]} ← ${STAGE_SHORT[to]}</span>
+        <span class="conv-stages">${STAGE_SHORT[from]} ← ${toLabel}</span>
         <span class="conv-pct">${pct===null?'<span style="color:var(--muted-2);font-weight:600">אין מספיק נתונים</span>':pct+'%'}</span>
       </div>
       <div class="conv-bar"><i style="width:${pct===null?0:Math.min(pct,100)}%"></i></div>
-    </div>`);
-  }
+    </div>`;
+  });
   document.getElementById('conversions').innerHTML=rows.join('');
 }
 
