@@ -69,27 +69,51 @@ gold dot on any day you completed a meeting — so momentum is visible at a glan
 - **Undo** reverses the last action; **Correct totals** nudges any stage to
   match reality (logged, so it stays undoable).
 
-### Your data
-Everything lives in your browser's `localStorage` on this device. From the
-**Data** tab you can **export JSON** (full backup), **export CSV** (activity
-log), or **import** a JSON backup. Export before switching phones or clearing
-your browser.
+### Your data — cloud sync
+Cadence signs in to a single account (email + password) and stores every call,
+follow-up, correction, and your goals in a shared cloud database (Supabase).
+Sign in with the same account on your phone and your desktop and both show the
+exact same activity, updated immediately. `localStorage` is still used as an
+**offline cache** — actions save instantly on the device and sync to the cloud
+in the background, so nothing is lost if you're briefly offline; queued
+actions flush automatically (without duplicating) once you're back online.
+
+From the **Data** tab you can also **export JSON** (full backup), **export
+CSV** (activity log), or **import** a JSON backup — useful as an extra local
+safety copy alongside the cloud sync.
+
+#### One-time cloud setup
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the project's **SQL Editor**, run [`supabase_schema.sql`](supabase_schema.sql) once — it creates the `events` and `settings` tables with row-level security so only your signed-in account can read or write your rows.
+3. In **Settings → API**, copy the **Project URL** and **anon public key** into [`assets/config.js`](assets/config.js).
+4. Open the app and create your account on the sign-in screen (any email + a password of 6+ characters). Sign in with the same account on every device.
+
+The anon key is meant to be public (Supabase's security model relies on the
+database rules in the SQL script, not on hiding this key), so it's safe to
+commit `config.js` as-is once filled in.
 
 ## Tech
 
-Plain HTML + CSS + vanilla JavaScript. No frameworks, no network calls, works
-offline. Data model is a single append-only event log; all counters and stats
-are derived from it, which keeps undo and corrections consistent.
+Plain HTML + CSS + vanilla JavaScript, no build step. The event log (calls,
+follow-ups, corrections) and one settings row (goals + last-picked audience)
+sync to Postgres via Supabase; every write also lands in `localStorage`
+immediately for instant UI feedback and offline resilience. A small pending-
+operations queue (`assets/sync.js`) flushes to the cloud in the background and
+upserts by each record's own id, so retries after a dropped connection never
+create duplicates.
 
 ```
-index.html            markup + layout
-assets/styles.css      muted-slate theme, glass cards, bento grid, trend chart
-assets/app.js          data model, funnel logic, stats, trend, persistence
-assets/icon.svg        app icon
-manifest.webmanifest   PWA metadata (installable)
-sw.js                  service worker — offline app shell cache
+index.html               markup + layout + auth screen
+assets/styles.css         muted-slate theme, glass cards, bento grid, trend chart
+assets/app.js             data model, funnel logic, stats, trend, auth/sync wiring
+assets/sync.js            Supabase auth + cloud read/write + offline outbox
+assets/config.js          your Supabase Project URL + anon key
+assets/vendor/supabase.js vendored Supabase JS SDK (cached offline like everything else)
+assets/icon.svg           app icon
+manifest.webmanifest      PWA metadata (installable)
+sw.js                     service worker — offline app-shell cache (not API calls)
+supabase_schema.sql       run once in Supabase's SQL Editor to create the tables
 ```
 
-When you change `app.js` or `styles.css`, bump the `?v=` query in `index.html`
-and the matching `CACHE`/`ASSETS` version in `sw.js` so installed clients pick
-up the update.
+When you change any cached file, bump `CACHE` in `sw.js` so installed clients
+pick up the update (already done for you in commits going forward).

@@ -11,7 +11,31 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="assets/styles.css" />
 <!-- HTML lives in index.html; app boots from assets/app.js at the end of body -->
-<div id="app">
+
+<!-- ===== Auth gate — shown until a cloud session exists ===== -->
+<div id="authScreen" class="auth-screen" hidden>
+  <div class="auth-card glass">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <h1 class="auth-title">Cadence</h1>
+    <p class="auth-sub" id="authSub">התחברות לחשבון הענן שלכם</p>
+
+    <div id="authNotConfigured" class="auth-warning" hidden>
+      סנכרון הענן עדיין לא הוגדר. יש להשלים את ההגדרה בקובץ <code>assets/config.js</code>.
+    </div>
+
+    <form id="authForm" class="auth-form">
+      <label class="range-field-label" for="authEmail">אימייל</label>
+      <input class="date-field" id="authEmail" type="email" autocomplete="username" required />
+      <label class="range-field-label" for="authPassword">סיסמה</label>
+      <input class="date-field" id="authPassword" type="password" autocomplete="current-password" minlength="6" required />
+      <p id="authError" class="auth-error" hidden></p>
+      <button class="sheet-cta press" id="authSubmit" type="submit">התחברות</button>
+      <button class="ghost-wide press auth-toggle" id="authToggleMode" type="button">אין לי חשבון — יצירת חשבון חדש</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" hidden>
   <!-- ===== Top bar ===== -->
   <header class="topbar glass">
     <div class="brand">
@@ -143,8 +167,13 @@
     <!-- ============================================================= -->
     <section id="view-data" class="view" hidden>
       <div class="card">
+        <div class="card-head"><h2>חשבון וסנכרון</h2><span class="card-sub" id="syncStatus">מסונכרן</span></div>
+        <p class="muted-p">מחוברים כ־<strong id="accountEmail">—</strong>. הנתונים נשמרים בענן ומוצגים בכל מכשיר עם אותו חשבון.</p>
+        <button id="signOutBtn" class="ghost-wide press" type="button"><span data-icon="undo"></span><span>התנתקות</span></button>
+      </div>
+      <div class="card">
         <div class="card-head"><h2>גיבוי</h2><span class="card-sub">שמרו על ההיסטוריה שלכם</span></div>
-        <p class="muted-p">כל הנתונים נשמרים במכשיר הזה. ייצאו עותק לפני מעבר למכשיר אחר או ניקוי הדפדפן.</p>
+        <p class="muted-p">הנתונים מסונכרנים אוטומטית בענן. ייצוא ידני מומלץ כגיבוי נוסף מדי פעם.</p>
         <div class="data-actions">
           <button id="exportJson" class="ghost-wide press" type="button"><span data-icon="download"></span><span>ייצוא JSON</span></button>
           <button id="exportCsv" class="ghost-wide press" type="button"><span data-icon="table"></span><span>ייצוא CSV</span></button>
@@ -185,4 +214,7 @@
 
   <div id="toast" class="toast" hidden></div>
 </div>
+<script src="assets/vendor/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/sync.js"></script>
 <script src="assets/app.js"></script>

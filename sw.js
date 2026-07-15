@@ -1,10 +1,13 @@
 /* Cadence service worker — cache the app shell for offline use. */
-const CACHE = 'cadence-v4';
+const CACHE = 'cadence-v5';
 const ASSETS = [
   './',
   './index.html',
   './assets/styles.css',
   './assets/app.js',
+  './assets/sync.js',
+  './assets/config.js',
+  './assets/vendor/supabase.js',
   './assets/icon.svg',
   './manifest.webmanifest',
 ];
@@ -27,11 +30,14 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Cache-first for our own GET assets; network otherwise. App is fully local, so
-// this makes it work with no connection at all once loaded once.
+// Cache-first for our own GET assets (the static app shell) so the app works
+// fully offline. Cross-origin requests — Supabase auth/REST calls — are left
+// untouched and go straight to the network: caching those would mean
+// re-serving stale cloud data (or stale auth state) on every later load.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  if (new URL(req.url).origin !== self.location.origin) return;
   e.respondWith(
     caches.match(req).then((hit) =>
       hit ||

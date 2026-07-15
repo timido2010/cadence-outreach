@@ -123,6 +123,7 @@ const DEFAULT_STATE={
 };
 let state=loadState();
 let ui={ activeDate:todayKey(), view:'dashboard', range:'today', filter:'all', customFrom:null, customTo:null };
+let currentUserId=null; // set once signed in; gates all cloud writes
 
 function loadState(){
   try{
@@ -186,14 +187,21 @@ function dayCounts(dateKey, audience){
 function record(kind,label,deltas,tone){
   const ev={ id:uid(), ts:Date.now(), dateKey:ui.activeDate, audience:state.audience, kind, label, deltas };
   state.events.push(ev); save();
+  if(currentUserId) CadenceSync.enqueueUpsertEvent(CadenceSync.eventToRow(ev, currentUserId));
   renderDashboard();
   toast(label, tone==='gold'?'gold':'good');
 }
 function undoLast(){
   if(!state.events.length)return;
   const ev=state.events.pop(); save();
+  if(currentUserId) CadenceSync.enqueueDeleteEvent(ev.id);
   renderDashboard();
   toast(`בוטל: ${ev.label}`,'undo');
+}
+// Queue the current goals + audience as one settings row (last-write-wins).
+function pushSettings(){
+  if(!currentUserId)return;
+  CadenceSync.enqueueUpsertSettings({ user_id:currentUserId, goals:state.goals, audience:state.audience });
 }
 
 /* ---------- Toast ---------- */
@@ -353,9 +361,11 @@ function openAdjustSheet(){
     const deltas={}; let any=false;
     stages.forEach(st=>{ const d=working[st]-base[st]; if(d!==0){ deltas[st]=d; any=true; } });
     if(any){
-      state.events.push({ id:uid(), ts:Date.now(), dateKey:ui.activeDate,
-        audience:state.audience, kind:'adjust', label:'תיקון ידני', deltas });
-      save(); renderDashboard(); toast('הסכומים תוקנו','good');
+      const ev={ id:uid(), ts:Date.now(), dateKey:ui.activeDate,
+        audience:state.audience, kind:'adjust', label:'תיקון ידני', deltas };
+      state.events.push(ev); save();
+      if(currentUserId) CadenceSync.enqueueUpsertEvent(CadenceSync.eventToRow(ev, currentUserId));
+      renderDashboard(); toast('הסכומים תוקנו','good');
     }
     closeSheet();
   });
@@ -430,7 +440,7 @@ function openGoalsSheet(){
     document.getElementById(g==='call'?'gcall':'gmeet').textContent=draft[g];
   }));
   document.getElementById('goalsSave').addEventListener('click',()=>{
-    state.goals=draft; save(); renderDashboard(); toast('היעדים עודכנו'); closeSheet();
+    state.goals=draft; save(); pushSettings(); renderDashboard(); toast('היעדים עודכנו'); closeSheet();
   });
 }
 
@@ -585,7 +595,14 @@ function renderRatios(c){
 /* ============================================================
    Rendering — Data / activity log
    ============================================================ */
+function updateSyncStatus(){
+  const el=document.getElementById('syncStatus'); if(!el)return;
+  const n= currentUserId ? CadenceSync.pendingCount() : 0;
+  el.textContent = n>0 ? `מסנכרן… (${n} ממתינים)` : 'מסונכרן';
+}
+
 function renderData(){
+  updateSyncStatus();
   document.getElementById('logDateLabel').textContent=humanDate(ui.activeDate);
   const evs=state.events.filter(e=>e.dateKey===ui.activeDate).slice().sort((a,b)=>b.ts-a.ts);
   const box=document.getElementById('activityLog');
@@ -638,7 +655,14 @@ function importJSON(file){
       if(!confirm(`לייבא ${s.events.length} רשומות? פעולה זו תחליף את הנתונים הנוכחיים.`))return;
       state={ events:s.events, goals:Object.assign({call:25,meetingCompleted:3},s.goals||{}),
         audience:AUDIENCES[s.audience]?s.audience:'seller' };
-      save(); renderAll(); toast('הגיבוי שוחזר');
+      save();
+      if(currentUserId){
+        // Upsert is idempotent, so queuing every imported row is safe even
+        // if some were already in the cloud.
+        state.events.forEach(ev=>CadenceSync.enqueueUpsertEvent(CadenceSync.eventToRow(ev,currentUserId)));
+        pushSettings();
+      }
+      renderAll(); toast('הגיבוי שוחזר');
     }catch(e){ toast('לא ניתן לקרוא את הקובץ'); }
   };
   reader.readAsText(file);
@@ -665,7 +689,7 @@ function wire(){
   paintIcons();
   // audience
   document.querySelectorAll('#view-dashboard .seg-btn[data-audience]').forEach(b=>
-    b.addEventListener('click',()=>{ state.audience=b.dataset.audience; save(); renderDashboard(); }));
+    b.addEventListener('click',()=>{ state.audience=b.dataset.audience; save(); pushSettings(); renderDashboard(); }));
   // primary
   document.getElementById('newCallBtn').addEventListener('click',openCallSheet);
   // follow-ups (delegated)
@@ -697,9 +721,12 @@ function wire(){
   document.getElementById('exportCsv').addEventListener('click',exportCSV);
   document.getElementById('importBtn').addEventListener('click',()=>document.getElementById('importFile').click());
   document.getElementById('importFile').addEventListener('change',e=>{ if(e.target.files[0])importJSON(e.target.files[0]); e.target.value=''; });
-  document.getElementById('resetBtn').addEventListener('click',()=>{
-    if(confirm('למחוק את כל הנתונים במכשיר? ייצאו גיבוי קודם — פעולה זו אינה הפיכה.')){
-      state=structuredClone(DEFAULT_STATE); save(); ui.activeDate=todayKey(); renderAll(); toast('כל הנתונים נמחקו','undo');
+  document.getElementById('resetBtn').addEventListener('click',async ()=>{
+    if(confirm('למחוק את כל הנתונים במכשיר ומהענן? ייצאו גיבוי קודם — פעולה זו אינה הפיכה.')){
+      state=structuredClone(DEFAULT_STATE); save(); ui.activeDate=todayKey();
+      CadenceSync.clearOutbox();
+      if(currentUserId){ try{ await CadenceSync.deleteAllCloudData(currentUserId); }catch(e){} }
+      renderAll(); toast('כל הנתונים נמחקו','undo');
     }
   });
 
@@ -719,9 +746,138 @@ if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 
-/* boot */
-document.documentElement.lang='he';
-document.documentElement.dir='rtl';
-renderDashboard();
-setView('dashboard');
-wire();
+/* ============================================================
+   Auth gate + cloud sync boot
+   ============================================================ */
+function showAuthScreen(){
+  document.getElementById('app').hidden=true;
+  document.getElementById('authScreen').hidden=false;
+}
+function showApp(){
+  document.getElementById('authScreen').hidden=true;
+  document.getElementById('app').hidden=false;
+}
+
+let authMode='signin';
+function wireAuthForm(){
+  const form=document.getElementById('authForm');
+  const toggleBtn=document.getElementById('authToggleMode');
+  const submitBtn=document.getElementById('authSubmit');
+  const errEl=document.getElementById('authError');
+
+  toggleBtn.addEventListener('click',()=>{
+    authMode = authMode==='signin' ? 'signup' : 'signin';
+    submitBtn.textContent = authMode==='signin' ? 'התחברות' : 'יצירת חשבון';
+    toggleBtn.textContent = authMode==='signin' ? 'אין לי חשבון — יצירת חשבון חדש' : 'יש לי כבר חשבון — התחברות';
+    errEl.hidden=true;
+  });
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    if(!CadenceSync.isConfigured()){
+      document.getElementById('authNotConfigured').hidden=false;
+      return;
+    }
+    const email=document.getElementById('authEmail').value.trim();
+    const password=document.getElementById('authPassword').value;
+    errEl.hidden=true; errEl.style.color=''; submitBtn.disabled=true;
+    try{
+      const fn = authMode==='signin' ? CadenceSync.signIn : CadenceSync.signUp;
+      const {error} = await fn(email,password);
+      if(error){ errEl.textContent=translateAuthError(error); errEl.hidden=false; return; }
+      if(authMode==='signup'){
+        // If email confirmation is required, no session exists yet — the
+        // auth-state listener will pick it up automatically once confirmed.
+        errEl.style.color='var(--good)';
+        errEl.textContent='החשבון נוצר. אם נדרש אימות אימייל, בדקו את תיבת הדואר ואז התחברו.';
+        errEl.hidden=false;
+      }
+    }catch(err){
+      errEl.textContent='שגיאת רשת — ודאו שיש חיבור לאינטרנט ונסו שוב.';
+      errEl.hidden=false;
+    }finally{
+      submitBtn.disabled=false;
+    }
+  });
+}
+function translateAuthError(error){
+  const m=(error&&error.message)||'';
+  if(/invalid login credentials/i.test(m))return 'אימייל או סיסמה שגויים.';
+  if(/already registered|already exists/i.test(m))return 'כבר קיים חשבון עם אימייל זה — נסו להתחבר.';
+  if(/password should be|at least 6/i.test(m))return 'הסיסמה קצרה מדי (לפחות 6 תווים).';
+  return 'שגיאה: '+m;
+}
+
+// Reconcile the cloud snapshot with anything still local-only: events that
+// pre-date this device's sync (or were made offline) get folded in and
+// re-queued for push; anything already sitting in the outbox (unconfirmed
+// upserts/deletes/settings) is re-applied on top so it isn't lost mid-flight.
+function mergeCloudIntoState(cloud, preExistingLocal){
+  const byId=new Map(cloud.events.map(e=>[e.id,e]));
+  preExistingLocal.forEach(ev=>{
+    if(!byId.has(ev.id)){
+      byId.set(ev.id, ev);
+      CadenceSync.enqueueUpsertEvent(CadenceSync.eventToRow(ev, currentUserId));
+    }
+  });
+  const pending=CadenceSync.peekOutbox();
+  pending.forEach(op=>{
+    if(op.type==='upsert_event')byId.set(op.row.id, CadenceSync.rowToEvent(op.row));
+    else if(op.type==='delete_event')byId.delete(op.id);
+  });
+  const events=[...byId.values()].sort((a,b)=>a.ts-b.ts);
+  let goals = cloud.goals || state.goals;
+  let audience = cloud.audience || state.audience;
+  const settingsOp=pending.find(op=>op.type==='upsert_settings');
+  if(settingsOp){ goals=settingsOp.row.goals; audience=settingsOp.row.audience; }
+  state={events,goals,audience};
+  save();
+  if(!cloud.goals) pushSettings(); // brand-new account: seed its settings row
+}
+
+async function onSignedIn(session){
+  currentUserId=session.user.id;
+  const preExistingLocal=state.events.slice();
+  try{
+    const cloud=await CadenceSync.fetchAll(currentUserId);
+    mergeCloudIntoState(cloud, preExistingLocal);
+  }catch(e){
+    toast('אין חיבור לענן כרגע — עובד מהעותק המקומי','undo');
+  }
+  document.getElementById('accountEmail').textContent = session.user.email||'—';
+  showApp();
+  renderDashboard();
+  setView(ui.view||'dashboard');
+  CadenceSync.flush();
+}
+function onSignedOut(){
+  currentUserId=null;
+  document.getElementById('authForm').reset();
+  showAuthScreen();
+}
+
+async function boot(){
+  document.documentElement.lang='he';
+  document.documentElement.dir='rtl';
+  wire();
+  wireAuthForm();
+  document.getElementById('signOutBtn').addEventListener('click',()=>CadenceSync.signOut());
+
+  const configured=CadenceSync.init();
+  if(!configured){
+    document.getElementById('authNotConfigured').hidden=false;
+    showAuthScreen();
+    return;
+  }
+  showAuthScreen();
+  // supabase-js fires this once immediately with whatever session (if any)
+  // was persisted from a previous visit, then again on every future
+  // sign-in/sign-out — one listener covers both the initial restore and
+  // subsequent auth changes.
+  CadenceSync.onAuthChange((session)=>{
+    if(session && session.user.id!==currentUserId){ onSignedIn(session); }
+    else if(!session && currentUserId!==null){ onSignedOut(); }
+    else if(!session){ showAuthScreen(); }
+  });
+}
+boot();

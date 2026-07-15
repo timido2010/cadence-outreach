@@ -256,6 +256,33 @@ svg{display:block}
 .conv-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
 .conv-bar > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .6s var(--spring)}
 
+/* ===== Auth gate ===== */
+.auth-screen{
+  position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:
+    radial-gradient(1200px 500px at 50% -10%, #131b26 0%, transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, #101722 0%, transparent 55%),
+    var(--bg);
+}
+.auth-card{
+  width:100%;max-width:360px;border-radius:var(--radius-lg);padding:28px 24px 24px;
+  display:flex;flex-direction:column;align-items:center;text-align:center;box-shadow:var(--shadow);
+}
+.auth-card .brand-mark{width:44px;height:44px;border-radius:13px;margin-bottom:14px}
+.auth-title{font-size:22px;font-weight:750;letter-spacing:-.02em;margin:0}
+.auth-sub{font-size:13px;color:var(--muted);margin:4px 0 20px}
+.auth-warning{
+  width:100%;font-size:12.5px;line-height:1.6;color:var(--gold);background:var(--gold-soft);
+  border:1px solid rgba(230,178,113,.3);border-radius:var(--radius);padding:11px 13px;margin-bottom:16px;
+}
+.auth-warning code{font-family:monospace;direction:ltr;display:inline-block}
+.auth-form{width:100%;text-align:start}
+.auth-error{
+  font-size:12.5px;color:var(--danger);background:rgba(232,122,122,.1);
+  border:1px solid rgba(232,122,122,.3);border-radius:var(--radius);padding:9px 12px;margin:2px 0 12px;
+}
+.auth-toggle{margin-top:10px;font-size:13px;min-height:44px}
+
 /* custom date range filter */
 #rangeSeg .range-custom{grid-column:1 / -1;flex-direction:row;gap:7px}
 #rangeSeg .range-custom [data-icon] svg{width:16px;height:16px}
