@@ -256,6 +256,24 @@ svg{display:block}
 .conv-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
 .conv-bar > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .6s var(--spring)}
 
+/* custom date range filter */
+#rangeSeg .range-custom{grid-column:1 / -1;flex-direction:row;gap:7px}
+#rangeSeg .range-custom [data-icon] svg{width:16px;height:16px}
+.custom-range-info{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  margin:-2px 0 8px;padding:10px 13px;border-radius:var(--radius);
+  background:var(--accent-soft);border:1px solid rgba(110,155,255,.35);
+  color:#cdddff;font-size:13px;font-weight:600;
+  transition:transform .15s var(--spring),border-color .2s;
+}
+.custom-range-info:hover{border-color:rgba(110,155,255,.55)}
+.custom-range-info:active{transform:scale(.98)}
+.custom-range-info [data-icon] svg{width:16px;height:16px}
+.custom-range-info .cri-dates{direction:ltr;font-variant-numeric:tabular-nums}
+/* date range picker fields */
+.range-field-label{display:block;font-size:12.5px;color:var(--muted);font-weight:550;margin:2px 2px 7px}
+.range-field-label + .date-field{margin-bottom:14px}
+
 /* trend chart */
 .trend{display:flex;align-items:flex-end;gap:3px;height:132px;padding-top:8px}
 .tcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;min-width:0}

@@ -108,7 +108,7 @@ const DEFAULT_STATE={
   audience:'seller',
 };
 let state=loadState();
-let ui={ activeDate:todayKey(), view:'dashboard', range:'today', filter:'all' };
+let ui={ activeDate:todayKey(), view:'dashboard', range:'today', filter:'all', customFrom:null, customTo:null };
 
 function loadState(){
   try{
@@ -138,12 +138,20 @@ function humanDate(k){
 function weekStart(ref){ const d=new Date(ref); const dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); d.setHours(0,0,0,0); return d; }
 function inRange(dateKey, range){
   if(range==='all')return true;
+  if(range==='custom'){
+    if(!ui.customFrom||!ui.customTo)return false;
+    // YYYY-MM-DD strings compare chronologically; both endpoints inclusive.
+    return dateKey>=ui.customFrom && dateKey<=ui.customTo;
+  }
   const d=parseKey(dateKey), now=new Date();
   if(range==='today')return dateKey===todayKey();
   if(range==='week'){ const s=weekStart(now); return d>=s; }
   if(range==='month')return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
   return true;
 }
+// dd/mm/yyyy for display; the whole label is forced LTR in CSS.
+function fmtDMY(key){ const [y,m,d]=key.split('-'); return `${d}/${m}/${y}`; }
+function customRangeLabel(){ return `${fmtDMY(ui.customFrom)} – ${fmtDMY(ui.customTo)}`; }
 
 /* ---------- Aggregation ---------- */
 function emptyCounts(){ const o={}; COUNTERS.forEach(c=>o[c]=0); return o; }
@@ -357,6 +365,29 @@ function openDateSheet(){
   });
 }
 
+// Custom statistics range: pick מתאריך / עד תאריך, then show the data.
+function openCustomRangeSheet(){
+  openSheet('טווח מותאם');
+  // Default to the last 30 days ending today when nothing is set yet.
+  const d30=new Date(); d30.setDate(d30.getDate()-29);
+  const from=ui.customFrom||keyOf(d30);
+  const to=ui.customTo||todayKey();
+  sheetBody.innerHTML=`
+    <p class="muted-p">בחרו טווח תאריכים להצגת הסטטיסטיקות.</p>
+    <label class="range-field-label" for="rangeFrom">מתאריך</label>
+    <input class="date-field" type="date" id="rangeFrom" value="${from}" />
+    <label class="range-field-label" for="rangeTo">עד תאריך</label>
+    <input class="date-field" type="date" id="rangeTo" value="${to}" />
+    <button class="sheet-cta press" id="rangeGo" type="button">הצג נתונים</button>`;
+  document.getElementById('rangeGo').addEventListener('click',()=>{
+    let a=document.getElementById('rangeFrom').value, b=document.getElementById('rangeTo').value;
+    if(!a||!b){ toast('בחרו תאריך התחלה וסיום'); return; }
+    if(a>b){ const t=a; a=b; b=t; }   // tolerate reversed input
+    ui.customFrom=a; ui.customTo=b; ui.range='custom';
+    renderStats(); closeSheet();
+  });
+}
+
 function openGoalsSheet(){
   openSheet('יעדים יומיים');
   sheetBody.innerHTML=`
@@ -399,6 +430,14 @@ function renderStats(){
   document.querySelectorAll('#rangeSeg .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.range===ui.range));
   document.querySelectorAll('#audFilterSeg .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===ui.filter));
 
+  // Custom-range caption: shows the active range and re-opens the picker.
+  const info=document.getElementById('customRangeInfo');
+  if(ui.range==='custom' && ui.customFrom && ui.customTo){
+    info.hidden=false;
+    info.innerHTML=`<span data-icon="calendar"></span><span class="cri-dates">${customRangeLabel()}</span>`;
+    paintIcons(info);
+  }else{ info.hidden=true; }
+
   const c=aggregate(ev=> inRange(ev.dateKey,ui.range) && (ui.filter==='all'||ev.audience===ui.filter));
 
   const answerRate=fmtPct(c.answered,c.call);
@@ -432,7 +471,23 @@ function buildTrend(){
   const audOk=ev=>(ui.filter==='all'||ev.audience===ui.filter);
   const now=new Date();
   const buckets=[];
-  if(ui.range==='all'){
+  if(ui.range==='custom' && ui.customFrom && ui.customTo){
+    // Adapt bucket size to the span so a long range stays readable:
+    // <=31 days daily, <=~6 months weekly, otherwise monthly.
+    const from=parseKey(ui.customFrom), to=parseKey(ui.customTo);
+    const span=Math.round((to-from)/86400000)+1;
+    if(span<=31){
+      for(let d=new Date(from); d<=to; d.setDate(d.getDate()+1))
+        buckets.push({label:String(d.getDate()), dk:keyOf(d)});
+    }else if(span<=186){
+      for(let s=weekStart(from); s<=to; ){ const e=new Date(s); e.setDate(e.getDate()+7);
+        buckets.push({label:`${s.getDate()}/${s.getMonth()+1}`, from:new Date(s), to:e}); s=e; }
+    }else{
+      for(let s=new Date(from.getFullYear(),from.getMonth(),1); s<=to; ){ const e=new Date(s.getFullYear(),s.getMonth()+1,1);
+        buckets.push({label:`${s.getMonth()+1}/${String(s.getFullYear()).slice(2)}`, from:new Date(s), to:e}); s=e; }
+    }
+    document.getElementById('trendLabel').textContent=customRangeLabel();
+  }else if(ui.range==='all'){
     const start=weekStart(now);
     for(let i=11;i>=0;i--){ const s=new Date(start); s.setDate(s.getDate()-i*7); const e=new Date(s); e.setDate(e.getDate()+7);
       buckets.push({label:`${s.getDate()}/${s.getMonth()+1}`, from:s, to:e}); }
@@ -582,6 +637,9 @@ function setView(v){
   ui.view=v;
   document.querySelectorAll('.view').forEach(s=>s.hidden = s.id!=='view-'+v);
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  // The top day selector belongs to day-based screens; Stats has its own
+  // period filters, so hide it there to avoid confusion.
+  document.getElementById('dateBtn').hidden = (v==='stats');
   if(v==='dashboard')renderDashboard();
   if(v==='stats')renderStats();
   if(v==='data')renderData();
@@ -615,7 +673,10 @@ function wire(){
   // tabs
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setView(t.dataset.view)));
   // stats segments
-  document.getElementById('rangeSeg').addEventListener('click',e=>{ const b=e.target.closest('[data-range]'); if(!b)return; ui.range=b.dataset.range; renderStats(); });
+  document.getElementById('rangeSeg').addEventListener('click',e=>{ const b=e.target.closest('[data-range]'); if(!b)return;
+    if(b.dataset.range==='custom'){ openCustomRangeSheet(); return; }
+    ui.range=b.dataset.range; renderStats(); });
+  document.getElementById('customRangeInfo').addEventListener('click',openCustomRangeSheet);
   document.getElementById('audFilterSeg').addEventListener('click',e=>{ const b=e.target.closest('[data-filter]'); if(!b)return; ui.filter=b.dataset.filter; renderStats(); });
   // data actions
   document.getElementById('exportJson').addEventListener('click',exportJSON);
