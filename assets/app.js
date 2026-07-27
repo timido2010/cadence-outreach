@@ -826,11 +826,10 @@ function renderCalcInputs(){
     calcField('daysPerWeek','ימי עבודה בשבוע',calc.daysPerWeek),
   ].join('');
 
-  const fullCommission = calc.avgPrice*(calc.commissionPct/100);
   document.getElementById('calcSales').innerHTML=[
     calcField('avgPrice','מחיר נכס ממוצע (₪)',calc.avgPrice),
     calcField('commissionPct','אחוז עמלה ממוצע (%)',calc.commissionPct),
-    `<div class="calc-row"><span class="calc-label">עמלה מלאה מחושבת אוטומטית</span><span class="calc-computed">${fmtMoney(fullCommission)}</span></div>`,
+    `<div class="calc-row"><span class="calc-label">עמלה מלאה מחושבת אוטומטית</span><span class="calc-computed" id="calcFullCommission"></span></div>`,
     calcField('exclusivityToSalePct','אחוז חתימות בלעדיות שהופכות לעסקת מכירה (%)',calc.exclusivityToSalePct),
   ].join('');
 
@@ -864,11 +863,35 @@ function renderCalcInputs(){
   renderCalcResults();
 }
 
+const CALC_BADGE_TEXT={ good:['היעד ריאלי בקצב הנוכחי','var(--good)'], close:['קרוב ליעד — נדרש שיפור קל','var(--gold)'], far:['רחוק מהיעד — נדרש שיפור משמעותי','var(--danger)'] };
+
 function renderCalcResults(){
   const calc=state.calc, res=runCalculator();
 
+  // Keep this in sync on every recompute — it lives inside the assumptions
+  // card (rendered once by renderCalcInputs), not just at initial render.
+  const fullCommEl=document.getElementById('calcFullCommission');
+  if(fullCommEl) fullCommEl.textContent=fmtMoney(calc.avgPrice*(calc.commissionPct/100));
+
   const banner=document.getElementById('calcInsufficient');
   banner.hidden = !res.insufficientReal;
+
+  // Quick summary — headline numbers with no scrolling required.
+  document.getElementById('calcQuick').innerHTML=[
+    ['שיחות ביום עבודה', res.callsPerWorkDay, 'phone'],
+    ['פגישות בחודש', res.meetingsPerMonth, 'calcheck'],
+    ['חתימות בחודש', res.signedPerMonth, 'handshake'],
+  ].map(([label,val,icon])=>
+    `<div class="tile accent"><span class="tile-label"><span data-icon="${icon}"></span>${label}</span><span class="tile-val">${fmtInt(val)}</span></div>`
+  ).join('');
+  const quickBadge=document.getElementById('calcQuickBadge');
+  if(res.comparison){
+    const b=CALC_BADGE_TEXT[res.comparison.realistic];
+    quickBadge.innerHTML=`<div class="calc-badge" style="color:${b[1]};border-color:${b[1]}">${b[0]}</div>`;
+  }else{
+    quickBadge.innerHTML='';
+  }
+  paintIcons(document.getElementById('calcQuick'));
 
   document.getElementById('calcFinance').innerHTML=[
     ['מחזור עמלות נדרש לפני חלוקת RE/MAX', fmtMoney(res.grossCommissionNeeded)],
@@ -906,7 +929,7 @@ function renderCalcResults(){
   if(res.comparison){
     cmpCard.hidden=false;
     const c=res.comparison;
-    const badge={ good:['היעד ריאלי בקצב הנוכחי','var(--good)'], close:['קרוב ליעד — נדרש שיפור קל','var(--gold)'], far:['רחוק מהיעד — נדרש שיפור משמעותי','var(--danger)'] }[c.realistic];
+    const badge=CALC_BADGE_TEXT[c.realistic];
     document.getElementById('calcComparison').innerHTML=[
       ['יעד שנתי', fmtMoney(calc.income)],
       ['תחזית שנתית לפי הקצב הנוכחי', fmtMoney(c.projNetIncome)],
