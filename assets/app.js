@@ -680,20 +680,31 @@ function fmtInt(n){ return (n===null||n===undefined||!isFinite(n)) ? 'אין מ�
 function fmtMoney(n){ return (n===null||n===undefined||!isFinite(n)) ? 'אין מספיק נתונים' : '₪'+Math.round(n).toLocaleString('he-IL'); }
 function fmtSigned(n){ if(n===null||n===undefined||!isFinite(n))return 'אין מספיק נתונים'; const s=Math.round(n).toLocaleString('he-IL'); return n>0?'+'+s:s; }
 
-// Real funnel ratios (%) computed from every stored event, all audiences,
-// all time — reuses aggregate(), the exact same helper Stats is built on.
+// Real funnel ratios (%) computed from every stored event — reuses
+// aggregate(), the exact same helper Stats is built on.
+//
+// Landlord signings skip the meeting step entirely (FUNNELS.landlord goes
+// straight from qualified to signed — no meetingScheduled/meetingCompleted
+// at all), while Seller/Buyer always go through a meeting first. Blending
+// all three into one meetingCompleted->signed rate let landlord's
+// meeting-less signings inflate that rate — sometimes past 100% — which
+// could make "meetings needed" come out *lower* than "signings needed".
+// So the meeting-stage ratios (meetingPct/meetingCompletionPct/signedPct)
+// are computed from Seller+Buyer only; call/answered/qualified still blend
+// all three audiences, since every audience makes calls the same way.
 function getRealFunnelRatios(){
   const c=aggregate(()=>true);
+  const cMeeting=aggregate(ev=>ev.audience==='seller'||ev.audience==='buyer');
   const activeDays=new Set();
   state.events.forEach(ev=>{ if(ev.deltas.call>0)activeDays.add(ev.dateKey); });
   const n=activeDays.size;
   const avgCallsPerActiveDay = n>0 ? c.call/n : 0;
   const answeredPct = c.call>0 ? c.answered/c.call*100 : 0;
   const qualifiedPct = c.answered>0 ? c.qualified/c.answered*100 : 0;
-  const meetingPct = c.qualified>0 ? c.meetingScheduled/c.qualified*100 : 0;
-  const meetingCompletionPct = c.meetingScheduled>0 ? c.meetingCompleted/c.meetingScheduled*100 : 0;
-  const signedPct = c.meetingCompleted>0 ? c.signed/c.meetingCompleted*100 : 0;
-  const ok = c.call>0 && c.answered>0 && c.qualified>0 && c.meetingScheduled>0 && c.meetingCompleted>0 && c.signed>0;
+  const meetingPct = cMeeting.qualified>0 ? cMeeting.meetingScheduled/cMeeting.qualified*100 : 0;
+  const meetingCompletionPct = cMeeting.meetingScheduled>0 ? cMeeting.meetingCompleted/cMeeting.meetingScheduled*100 : 0;
+  const signedPct = cMeeting.meetingCompleted>0 ? cMeeting.signed/cMeeting.meetingCompleted*100 : 0;
+  const ok = c.call>0 && c.answered>0 && c.qualified>0 && cMeeting.meetingScheduled>0 && cMeeting.meetingCompleted>0 && cMeeting.signed>0;
   return { raw:c, activeDays:n, avgCallsPerActiveDay, answeredPct, qualifiedPct, meetingPct, meetingCompletionPct, signedPct, ok };
 }
 
@@ -751,9 +762,24 @@ function runCalculator(){
   // and can't see. Show "not enough data" for those instead; the deal/
   // financial numbers above are unaffected since they don't depend on r.
   const rOk = !insufficientReal;
-  const meetingsCompletedNeeded = (rOk && signedNeededTotal!==null && r.signedPct>0) ? signedNeededTotal/(r.signedPct/100) : null;
+
+  // Meetings are only required for the sales track — Seller/Buyer funnels
+  // go through a meeting before signing, but the rental track (Landlord)
+  // signs directly after a qualified conversation, no meeting at all.
+  // Blending both into meetingsNeeded would let landlord's meeting-less
+  // signings understate the real meeting requirement (or even make
+  // "meetings needed" come out below "signings needed").
+  const meetingsCompletedNeeded = (rOk && signedNeededSales!==null && r.signedPct>0) ? signedNeededSales/(r.signedPct/100) : null;
   const meetingsScheduledNeeded = (meetingsCompletedNeeded!==null && r.meetingCompletionPct>0) ? meetingsCompletedNeeded/(r.meetingCompletionPct/100) : null;
-  const qualifiedNeeded = (meetingsScheduledNeeded!==null && r.meetingPct>0) ? meetingsScheduledNeeded/(r.meetingPct/100) : null;
+  const qualifiedNeededSales = (meetingsScheduledNeeded!==null && r.meetingPct>0) ? meetingsScheduledNeeded/(r.meetingPct/100) : null;
+
+  // The rental track still needs its own qualified conversations to reach
+  // its signings — via the same overall qualified->signed rate, just
+  // without an explicit meeting step in between.
+  const qualifiedToSignedPct = (r.meetingPct/100)*(r.meetingCompletionPct/100)*(r.signedPct/100);
+  const qualifiedNeededRentals = (rOk && signedNeededRentals!==null && qualifiedToSignedPct>0) ? signedNeededRentals/qualifiedToSignedPct : null;
+
+  const qualifiedNeeded = (qualifiedNeededSales===null && qualifiedNeededRentals===null) ? null : (qualifiedNeededSales||0)+(qualifiedNeededRentals||0);
   const answeredNeeded = (qualifiedNeeded!==null && r.qualifiedPct>0) ? qualifiedNeeded/(r.qualifiedPct/100) : null;
   const callsNeeded = (answeredNeeded!==null && r.answeredPct>0) ? answeredNeeded/(r.answeredPct/100) : null;
 
@@ -770,17 +796,24 @@ function runCalculator(){
     const projectedAnnualCalls = real.avgCallsPerActiveDay*workingDaysPerYear;
     const projAnswered = projectedAnnualCalls*(real.answeredPct/100);
     const projQualified = projAnswered*(real.qualifiedPct/100);
-    const projMeetingsSched = projQualified*(real.meetingPct/100);
+    // Split projected qualified conversations by the same sales/rentals mix
+    // used on the financial side, so the forecast stays consistent with
+    // "rentals are sourced from Landlords, who sign with no meeting."
+    const projQualifiedSales = projQualified*mixSales;
+    const projQualifiedRentals = projQualified*mixRentals;
+    const projMeetingsSched = projQualifiedSales*(real.meetingPct/100);
     const projMeetingsDone = projMeetingsSched*(real.meetingCompletionPct/100);
-    const projSigned = projMeetingsDone*(real.signedPct/100);
-    const projSalesDeals = projSigned*mixSales*(calc.exclusivityToSalePct/100);
-    const projRentalDeals = projSigned*mixRentals*(calc.brokerageToRentalPct/100);
+    const projSignedSales = projMeetingsDone*(real.signedPct/100);
+    const realQualifiedToSignedPct = (real.meetingPct/100)*(real.meetingCompletionPct/100)*(real.signedPct/100);
+    const projSignedRentals = projQualifiedRentals*realQualifiedToSignedPct;
+    const projSalesDeals = projSignedSales*(calc.exclusivityToSalePct/100);
+    const projRentalDeals = projSignedRentals*(calc.brokerageToRentalPct/100);
     const projRevenue = projSalesDeals*fullSaleCommission + projRentalDeals*calc.rentalCommission;
     const projNetIncome = projRevenue*splitFactor-annualMarketing;
     const forecastGap = projNetIncome-calc.income;
     const extraCallsPerDay = callsPerWorkDay!==null ? Math.max(0, callsPerWorkDay-real.avgCallsPerActiveDay) : null;
     const extraMeetingsPerMonth = meetingsPerMonth!==null ? Math.max(0, meetingsPerMonth-(projMeetingsDone/calc.workMonths)) : null;
-    const extraSignedTotal = signedNeededTotal!==null ? Math.max(0, signedNeededTotal-projSigned) : null;
+    const extraSignedTotal = signedNeededTotal!==null ? Math.max(0, signedNeededTotal-(projSignedSales+projSignedRentals)) : null;
     const realistic = forecastGap>=0 ? 'good' : (forecastGap>=-Math.abs(calc.income)*0.2 ? 'close' : 'far');
     comparison={ projectedAnnualCalls, projNetIncome, forecastGap, extraCallsPerDay, extraMeetingsPerMonth, extraSignedTotal, realistic };
   }
