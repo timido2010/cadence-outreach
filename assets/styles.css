@@ -481,7 +481,9 @@ svg{display:block}
 .calc-sub{font-size:12.5px;color:var(--muted);margin:4px 0 0;line-height:1.5}
 .calc-fields{display:flex;flex-direction:column;gap:12px}
 .calc-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.calc-label{font-size:13px;color:var(--muted);font-weight:550;flex:1;line-height:1.4}
+.calc-label-wrap{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.calc-label{font-size:13px;color:var(--muted);font-weight:550;line-height:1.4}
+.calc-help{font-size:11.5px;color:var(--muted-2);line-height:1.5}
 .calc-computed{font-size:15px;font-weight:750;color:var(--gold);font-variant-numeric:tabular-nums;flex:none}
 .calc-mix-total{margin:2px 2px 0;font-size:12.5px;color:var(--muted);font-weight:600}
 #calcMixTotal{color:var(--text);font-variant-numeric:tabular-nums}

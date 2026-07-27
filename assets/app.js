@@ -825,22 +825,38 @@ function runCalculator(){
     comparison };
 }
 
-const CALC_FIELDS=[
-  ['income','number'],['marketingMonthly','number'],['splitPct','pct'],
-  ['workMonths','number'],['weeksPerMonth','number'],['daysPerWeek','number'],
-  ['avgPrice','number'],['commissionPct','pct'],['exclusivityToSalePct','pct'],
-  ['rentalCommission','number'],['brokerageToRentalPct','pct'],
-];
 const CALC_MANUAL_FIELDS=[
   ['callsPerDay','number'],['answeredPct','pct'],['qualifiedPct','pct'],
   ['meetingPct','pct'],['meetingCompletionPct','pct'],['signedPct','pct'],
 ];
 
+// Short plain-Hebrew explanations for fields where the number alone is easy
+// to misread (e.g. two unrelated fields that happen to default to the same
+// percentage). Not every field needs one — only where confusion is likely.
+const CALC_HELP={
+  income:'הסכום שנשאר לך בכיס אחרי הוצאות שיווק ולפני מס — לא כולל את החלק שהולך לרימקס.',
+  splitPct:'איזה אחוז מהעמלה הולך לרימקס. השאר (100 פחות זה) נשאר אצלך.',
+  commissionPct:'האחוז מהמחיר שאתה גובה כעמלה מלאה בעסקת מכירה.',
+  exclusivityToSalePct:'מתוך הבלעדיות שאתה חותם עם מוכרים, כמה אחוז בסוף נסגרות בפועל כעסקת מכירה.',
+  rentalCommission:'הסכום המלא שאתה מקבל מהלקוח בעסקת השכרה (למשל: חודש שכירות) — לפני חלוקת רימקס.',
+  brokerageToRentalPct:'מתוך הסכמי התיווך שאתה חותם עם משכירים, כמה אחוז בסוף נסגרים בפועל כעסקת השכרה. אין קשר לאחוז החלוקה עם רימקס.',
+  callsPerDay:'קצב השיחות היומי לשימוש בתרחיש — אפשר להתחיל מהקצב האמיתי שלך ולשנות.',
+  answeredPct:'מתוך כל השיחות, אחוז שנענים בפועל.',
+  qualifiedPct:'מתוך השיחות שנענו, אחוז שהופכות לשיחה איכותית.',
+  meetingPct:'מתוך השיחות האיכותיות, אחוז שמובילות לקביעת פגישה.',
+  meetingCompletionPct:'מתוך הפגישות שנקבעו, אחוז שבאמת מתקיימות.',
+  signedPct:'מתוך הפגישות שהתקיימו (מוכר/קונה), אחוז שמסתיימות בחתימה.',
+};
+
 function calcField(key,label,value,manual){
   const path = manual? `manual.${key}` : key;
   const step = key.endsWith('Pct') ? '0.1' : 'any';
+  const help = CALC_HELP[key];
   return `<div class="calc-row">
-    <label class="calc-label" for="cf_${key}">${label}</label>
+    <div class="calc-label-wrap">
+      <label class="calc-label" for="cf_${key}">${label}</label>
+      ${help?`<span class="calc-help">${help}</span>`:''}
+    </div>
     <input class="num-field" id="cf_${key}" type="number" step="${step}" inputmode="decimal"
       data-calc-key="${path}" value="${value}" />
   </div>`;
@@ -862,7 +878,13 @@ function renderCalcInputs(){
   document.getElementById('calcSales').innerHTML=[
     calcField('avgPrice','מחיר נכס ממוצע (₪)',calc.avgPrice),
     calcField('commissionPct','אחוז עמלה ממוצע (%)',calc.commissionPct),
-    `<div class="calc-row"><span class="calc-label">עמלה מלאה מחושבת אוטומטית</span><span class="calc-computed" id="calcFullCommission"></span></div>`,
+    `<div class="calc-row">
+      <div class="calc-label-wrap">
+        <span class="calc-label">עמלה מלאה מחושבת אוטומטית</span>
+        <span class="calc-help">מחיר הנכס × אחוז העמלה — מחושב אוטומטית, אין צורך למלא.</span>
+      </div>
+      <span class="calc-computed" id="calcFullCommission"></span>
+    </div>`,
     calcField('exclusivityToSalePct','אחוז חתימות בלעדיות שהופכות לעסקת מכירה (%)',calc.exclusivityToSalePct),
   ].join('');
 
@@ -872,6 +894,7 @@ function renderCalcInputs(){
   ].join('');
 
   document.getElementById('calcMix').innerHTML=`
+    <p class="muted-p">איזה אחוז מההכנסה השנתית שלך אמור להגיע ממכירות מול השכרות. שינוי באחד מעדכן את השני אוטומטית כך שהסכום תמיד יישאר 100%.</p>
     <div class="calc-row"><label class="calc-label" for="cf_mixSalesPct">מכירות (%)</label>
       <input class="num-field" id="cf_mixSalesPct" type="number" step="1" inputmode="decimal" data-calc-key="mixSalesPct" value="${calc.mixSalesPct}" /></div>
     <div class="calc-row"><label class="calc-label" for="cf_mixRentalsPct">השכרות (%)</label>
