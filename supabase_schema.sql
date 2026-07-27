@@ -38,13 +38,19 @@ create policy "events_delete_own" on public.events
 -- should ever reach these tables — never the anonymous "anon" role.
 grant select, insert, update, delete on public.events to authenticated;
 
--- One settings row per user: daily goals + last-selected audience.
+-- One settings row per user: daily goals + last-selected audience +
+-- מחשבון יעדים (goal calculator) assumptions/mode, kept as a free-form jsonb
+-- blob since it's a self-contained set of business assumptions, not
+-- something other parts of the schema need to query into.
 create table if not exists public.settings (
   user_id       uuid primary key references auth.users(id) on delete cascade,
   goals         jsonb not null default '{"call":25,"meetingCompleted":3}'::jsonb,
   audience      text not null default 'seller',
+  calc_settings jsonb not null default '{}'::jsonb,
   updated_at    timestamptz not null default now()
 );
+
+alter table public.settings add column if not exists calc_settings jsonb not null default '{}'::jsonb;
 
 alter table public.settings enable row level security;
 

@@ -191,12 +191,83 @@
         <button id="resetBtn" class="danger-btn press" type="button">מחיקת כל הנתונים</button>
       </div>
     </section>
+
+    <!-- ============================================================= -->
+    <!-- מחשבון יעדים (GOAL CALCULATOR) VIEW                            -->
+    <!-- ============================================================= -->
+    <section id="view-calc" class="view" hidden>
+      <div class="calc-head">
+        <h1 class="calc-title">מחשבון יעדים</h1>
+        <p class="calc-sub">כמה שיחות, פגישות וחתימות צריך כדי להגיע ליעד ההכנסה השנתי שלכם.</p>
+      </div>
+
+      <div class="segment" id="calcModeSeg" role="group" aria-label="מצב חישוב">
+        <button class="seg-btn" data-mode="mine" type="button">לפי הנתונים שלי</button>
+        <button class="seg-btn" data-mode="manual" type="button">תרחיש ידני</button>
+      </div>
+
+      <div id="calcInsufficient" class="editing-banner" hidden>
+        <span data-icon="edit"></span>
+        <span>אין עדיין מספיק נתונים אמיתיים (שיחות, פגישות וחתימות) כדי לחשב לפי הביצועים בפועל. עברו ל"תרחיש ידני" כדי להזין הנחות ידניות ולראות תחזית.</span>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>הנחות כלליות</h2></div>
+        <div id="calcGeneral" class="calc-fields"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>הנחות מכירה</h2></div>
+        <div id="calcSales" class="calc-fields"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>הנחות השכרה</h2></div>
+        <div id="calcRental" class="calc-fields"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>תמהיל עסקאות</h2><span class="card-sub">חייב להסתכם ב-100%</span></div>
+        <div id="calcMix" class="calc-fields"></div>
+      </div>
+
+      <div class="card" id="calcManualCard" hidden>
+        <div class="card-head"><h2>הנחות פעילות — תרחיש ידני</h2></div>
+        <div id="calcManual" class="calc-fields"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>תוצאות פיננסיות</h2></div>
+        <div id="calcFinance"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>עסקאות נדרשות</h2></div>
+        <div id="calcDeals"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>פעילות נדרשת</h2></div>
+        <div id="calcActivity"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>פילוח לפי זמן</h2></div>
+        <div id="calcTime"></div>
+      </div>
+
+      <div class="card" id="calcComparisonCard" hidden>
+        <div class="card-head"><h2>השוואת ביצועים</h2><span class="card-sub">יעד מול הקצב בפועל</span></div>
+        <div id="calcComparison"></div>
+      </div>
+    </section>
   </main>
 
   <!-- ===== Bottom nav ===== -->
   <nav class="tabbar glass">
     <button class="tab" data-view="dashboard" type="button"><span data-icon="target"></span><span>מעקב</span></button>
     <button class="tab" data-view="stats" type="button"><span data-icon="chart"></span><span>סטטיסטיקות</span></button>
+    <button class="tab" data-view="calc" type="button"><span data-icon="calc"></span><span>יעדים</span></button>
     <button class="tab" data-view="data" type="button"><span data-icon="database"></span><span>נתונים</span></button>
   </nav>
 

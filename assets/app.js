@@ -28,6 +28,8 @@ const ICONS = {
   users:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17 20a5.5 5.5 0 0 0-2.3-4.5"/>',
   percent:'<path d="M19 5 5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/>',
   ratio:'<rect x="3" y="8" width="7" height="8" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/>',
+  calc:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="11" r="1"/><circle cx="16" cy="11" r="1"/><circle cx="8" cy="15" r="1"/><circle cx="12" cy="15" r="1"/><circle cx="16" cy="15" r="1"/><circle cx="8" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="16" cy="19" r="1"/>',
+  coins:'<circle cx="9" cy="9" r="6"/><path d="M14.5 9a6 6 0 1 1-5.5 8.5"/><path d="M9 9h.01M9 6.5h.01M9 11.5h.01"/>',
 };
 function paintIcons(root=document){
   root.querySelectorAll('[data-icon]').forEach(el=>{
@@ -38,8 +40,10 @@ function paintIcons(root=document){
 }
 
 /* ---------- Config: audiences, results, follow-ups, funnels ---------- */
-// Canonical counters every event contributes to.
-const COUNTERS=['call','answered','qualified','meetingScheduled','meetingCompleted','signed'];
+// Canonical counters every event contributes to. saleClosed/rentalClosed are
+// completed-deal counters (post-signing fulfillment) — separate from the
+// call funnel, but tracked the same way (counter-only, no CRM fields).
+const COUNTERS=['call','answered','qualified','meetingScheduled','meetingCompleted','signed','saleClosed','rentalClosed'];
 
 const AUDIENCES={
   seller:{label:'מוכר'}, buyer:{label:'קונה'}, landlord:{label:'משכיר'},
@@ -72,17 +76,25 @@ const FOLLOWUPS={
   seller:[
     {key:'meeting_done', name:'פגישה התקיימה',        icon:'calcheck',  deltas:{meetingCompleted:1}},
     {key:'exclusivity',  name:'נחתמה בלעדיות',        icon:'handshake', tone:'gold', deltas:{signed:1}},
+    {key:'sale_closed',  name:'עסקת מכירה נסגרה',      icon:'coins',     tone:'gold', deltas:{saleClosed:1}},
     {key:'manual_meet',  name:'נקבעה פגישה ידנית',    icon:'flag',      full:true,   deltas:{meetingScheduled:1}},
   ],
   buyer:[
     {key:'meeting_done', name:'פגישה התקיימה',        icon:'calcheck',  deltas:{meetingCompleted:1}},
     {key:'brokerage',    name:'נחתם הסכם תיווך',      icon:'handshake', tone:'gold', deltas:{signed:1}},
+    {key:'sale_closed',  name:'עסקת מכירה נסגרה',      icon:'coins',     tone:'gold', deltas:{saleClosed:1}},
+    {key:'rental_closed',name:'עסקת השכרה נסגרה',      icon:'building',  tone:'gold', deltas:{rentalClosed:1}},
     {key:'manual_meet',  name:'נקבעה פגישה ידנית',    icon:'flag',      full:true,   deltas:{meetingScheduled:1}},
   ],
   landlord:[
-    {key:'brokerage',    name:'נחתם הסכם תיווך',      icon:'handshake', tone:'gold', full:true, deltas:{signed:1}},
+    {key:'brokerage',    name:'נחתם הסכם תיווך',      icon:'handshake', tone:'gold', deltas:{signed:1}},
+    {key:'rental_closed',name:'עסקת השכרה נסגרה',      icon:'building',  tone:'gold', full:true, deltas:{rentalClosed:1}},
   ],
 };
+// Extra correctable counters per audience, appended after the normal funnel
+// stages in "תיקון סכומים" — completed deals aren't part of the call funnel
+// (FUNNELS/dashboard widget stay untouched) but should still be fixable.
+const DEAL_COUNTERS={ seller:['saleClosed'], buyer:['saleClosed','rentalClosed'], landlord:['rentalClosed'] };
 
 // Funnel definition (ordered stages) per audience + a full/combined funnel for "All".
 const FUNNELS={
@@ -105,10 +117,12 @@ const CONV_STEPS={
 const STAGE_NAMES={
   call:'שיחות', answered:'נענו', qualified:'שיחות איכותיות', meetingScheduled:'פגישות שנקבעו',
   meetingCompleted:'פגישות שהתקיימו', signed:'הסכמים שנחתמו',
+  saleClosed:'עסקאות מכירה שנסגרו', rentalClosed:'עסקאות השכרה שנסגרו',
 };
 const STAGE_SHORT={
   call:'שיחה', answered:'נענו', qualified:'שיחה איכותית', meetingScheduled:'פגישה נקבעה',
   meetingCompleted:'פגישה התקיימה', signed:'נחתם',
+  saleClosed:'מכירה נסגרה', rentalClosed:'השכרה נסגרה',
 };
 // "Signed" reads differently per audience (exclusivity vs. brokerage
 // agreement) — used only in the Stats conversion section's labels.
@@ -116,15 +130,35 @@ const SIGNED_SHORT={ seller:'נחתמה בלעדיות', buyer:'נחתם הסכ�
 
 /* ---------- State / persistence ---------- */
 const STORAGE_KEY='cadence.v1';
+// מחשבון יעדים defaults. "mine" mode reads real ratios from state.events;
+// "manual" mode uses the `manual` block below, pre-filled from real data
+// when there's enough of it, otherwise these sensible starting points.
+const DEFAULT_CALC={
+  mode:'mine',
+  income:300000, marketingMonthly:1500, splitPct:50, workMonths:12, weeksPerMonth:4.33, daysPerWeek:6,
+  avgPrice:1800000, commissionPct:2, exclusivityToSalePct:60,
+  rentalCommission:6000, brokerageToRentalPct:50,
+  mixSalesPct:70, mixRentalsPct:30,
+  manual:{ callsPerDay:20, answeredPct:40, qualifiedPct:50, meetingPct:40, meetingCompletionPct:70, signedPct:20 },
+};
 const DEFAULT_STATE={
   events:[],                       // {id, ts, dateKey, audience, kind, label, deltas}
   goals:{call:25, meetingCompleted:3},
   audience:'seller',
+  calc:structuredClone(DEFAULT_CALC),
 };
 let state=loadState();
 let ui={ activeDate:todayKey(), view:'dashboard', range:'today', filter:'all', customFrom:null, customTo:null };
 let currentUserId=null; // set once signed in; gates all cloud writes
 
+function mergeCalc(saved){
+  const c=structuredClone(DEFAULT_CALC);
+  if(saved&&typeof saved==='object'){
+    Object.assign(c, saved);
+    c.manual=Object.assign(structuredClone(DEFAULT_CALC.manual), saved.manual||{});
+  }
+  return c;
+}
 function loadState(){
   try{
     const raw=localStorage.getItem(STORAGE_KEY);
@@ -134,6 +168,7 @@ function loadState(){
       events:Array.isArray(s.events)?s.events:[],
       goals:Object.assign({call:25,meetingCompleted:3}, s.goals||{}),
       audience:AUDIENCES[s.audience]?s.audience:'seller',
+      calc:mergeCalc(s.calc),
     };
   }catch(e){ console.warn('load failed',e); return structuredClone(DEFAULT_STATE); }
 }
@@ -198,10 +233,19 @@ function undoLast(){
   renderDashboard();
   toast(`בוטל: ${ev.label}`,'undo');
 }
-// Queue the current goals + audience as one settings row (last-write-wins).
+// Queue the current goals + audience + calculator settings as one settings
+// row (last-write-wins).
 function pushSettings(){
   if(!currentUserId)return;
-  CadenceSync.enqueueUpsertSettings({ user_id:currentUserId, goals:state.goals, audience:state.audience });
+  CadenceSync.enqueueUpsertSettings({ user_id:currentUserId, goals:state.goals, audience:state.audience, calc_settings:state.calc });
+}
+// The calculator's inputs fire on every keystroke — debounce the cloud push
+// so typing a number doesn't hammer the network, while the on-screen
+// recompute still happens instantly (callers still call save() synchronously).
+let pushSettingsTimer=null;
+function pushSettingsDebounced(){
+  clearTimeout(pushSettingsTimer);
+  pushSettingsTimer=setTimeout(pushSettings, 700);
 }
 
 /* ---------- Toast ---------- */
@@ -331,7 +375,7 @@ function openCallSheet(){
 }
 
 function openAdjustSheet(){
-  const stages=FUNNELS[state.audience];
+  const stages=[...FUNNELS[state.audience], ...(DEAL_COUNTERS[state.audience]||[])];
   openSheet(`תיקון סכומים — ${AUDIENCES[state.audience].label}`);
   const base=dayCounts(ui.activeDate,state.audience);
   const working={...base};
@@ -623,6 +667,308 @@ function renderData(){
 }
 
 /* ============================================================
+   מחשבון יעדים — goal calculator
+   Connects an annual income target to the same real call/conversion data
+   already tracked elsewhere in the app. Two modes:
+   - "mine": the funnel ratios are read straight from aggregate() — the
+     exact same numbers the Stats screen already shows.
+   - "manual": those same ratio fields become user-editable, pre-filled
+     from real data as a starting point, so testing a scenario never
+     touches the real stored stats.
+   ============================================================ */
+function fmtInt(n){ return (n===null||n===undefined||!isFinite(n)) ? 'אין מספיק נתונים' : Math.round(n).toLocaleString('he-IL'); }
+function fmtMoney(n){ return (n===null||n===undefined||!isFinite(n)) ? 'אין מספיק נתונים' : '₪'+Math.round(n).toLocaleString('he-IL'); }
+function fmtSigned(n){ if(n===null||n===undefined||!isFinite(n))return 'אין מספיק נתונים'; const s=Math.round(n).toLocaleString('he-IL'); return n>0?'+'+s:s; }
+
+// Real funnel ratios (%) computed from every stored event, all audiences,
+// all time — reuses aggregate(), the exact same helper Stats is built on.
+function getRealFunnelRatios(){
+  const c=aggregate(()=>true);
+  const activeDays=new Set();
+  state.events.forEach(ev=>{ if(ev.deltas.call>0)activeDays.add(ev.dateKey); });
+  const n=activeDays.size;
+  const avgCallsPerActiveDay = n>0 ? c.call/n : 0;
+  const answeredPct = c.call>0 ? c.answered/c.call*100 : 0;
+  const qualifiedPct = c.answered>0 ? c.qualified/c.answered*100 : 0;
+  const meetingPct = c.qualified>0 ? c.meetingScheduled/c.qualified*100 : 0;
+  const meetingCompletionPct = c.meetingScheduled>0 ? c.meetingCompleted/c.meetingScheduled*100 : 0;
+  const signedPct = c.meetingCompleted>0 ? c.signed/c.meetingCompleted*100 : 0;
+  const ok = c.call>0 && c.answered>0 && c.qualified>0 && c.meetingScheduled>0 && c.meetingCompleted>0 && c.signed>0;
+  return { raw:c, activeDays:n, avgCallsPerActiveDay, answeredPct, qualifiedPct, meetingPct, meetingCompletionPct, signedPct, ok };
+}
+
+// The full calculation: financial target -> required deals -> required
+// signed agreements -> walked back through the call funnel -> required
+// calls, plus a real-pace forecast for comparison.
+function runCalculator(){
+  const calc=state.calc, real=getRealFunnelRatios();
+  const usingReal = calc.mode==='mine';
+  const insufficientReal = usingReal && !real.ok;
+
+  const r = (usingReal && real.ok) ? {
+    answeredPct:real.answeredPct, qualifiedPct:real.qualifiedPct, meetingPct:real.meetingPct,
+    meetingCompletionPct:real.meetingCompletionPct, signedPct:real.signedPct, callsPerDay:real.avgCallsPerActiveDay,
+  } : {
+    answeredPct:calc.manual.answeredPct, qualifiedPct:calc.manual.qualifiedPct, meetingPct:calc.manual.meetingPct,
+    meetingCompletionPct:calc.manual.meetingCompletionPct, signedPct:calc.manual.signedPct, callsPerDay:calc.manual.callsPerDay,
+  };
+
+  const annualMarketing = calc.marketingMonthly*calc.workMonths;
+  const userShareNeeded = calc.income+annualMarketing;
+  const splitFactor = 1-(calc.splitPct/100);
+  const grossCommissionNeeded = splitFactor>0 ? userShareNeeded/splitFactor : null;
+
+  const mixSales=calc.mixSalesPct/100, mixRentals=calc.mixRentalsPct/100;
+  const fullSaleCommission = calc.avgPrice*(calc.commissionPct/100);
+  const revenueSalesNeeded = grossCommissionNeeded!==null ? grossCommissionNeeded*mixSales : null;
+  const revenueRentalsNeeded = grossCommissionNeeded!==null ? grossCommissionNeeded*mixRentals : null;
+
+  const dealsSalesRaw = (revenueSalesNeeded!==null && fullSaleCommission>0) ? revenueSalesNeeded/fullSaleCommission : null;
+  const dealsRentalsRaw = (revenueRentalsNeeded!==null && calc.rentalCommission>0) ? revenueRentalsNeeded/calc.rentalCommission : null;
+  const dealsSalesNeeded = dealsSalesRaw!==null ? Math.ceil(dealsSalesRaw) : null;
+  const dealsRentalsNeeded = dealsRentalsRaw!==null ? Math.ceil(dealsRentalsRaw) : null;
+  const dealsTotalNeeded = (dealsSalesNeeded||0)+(dealsRentalsNeeded||0);
+
+  // Rounding whole-deal counts up means the achievable result usually
+  // slightly *exceeds* the target — recompute the real resulting numbers
+  // from those rounded counts so "פער מול היעד" reflects that surplus
+  // rather than trivially reading zero. If the plan itself is impossible
+  // (e.g. a 100% RE/MAX split), keep these null too rather than showing a
+  // misleading ₪0/negative figure derived from a meaningless base.
+  const planPossible = grossCommissionNeeded!==null;
+  const achievedRevenue = planPossible ? (dealsSalesNeeded||0)*fullSaleCommission + (dealsRentalsNeeded||0)*calc.rentalCommission : null;
+  const achievedUserShare = planPossible ? achievedRevenue*splitFactor : null;
+  const achievedNetIncome = planPossible ? achievedUserShare-annualMarketing : null;
+  const gapVsTarget = planPossible ? achievedNetIncome-calc.income : null;
+
+  const signedNeededSales = (dealsSalesNeeded!==null && calc.exclusivityToSalePct>0) ? dealsSalesNeeded/(calc.exclusivityToSalePct/100) : null;
+  const signedNeededRentals = (dealsRentalsNeeded!==null && calc.brokerageToRentalPct>0) ? dealsRentalsNeeded/(calc.brokerageToRentalPct/100) : null;
+  const signedNeededTotal = (signedNeededSales===null&&signedNeededRentals===null) ? null : (signedNeededSales||0)+(signedNeededRentals||0);
+
+  // In "לפי הנתונים שלי" mode with insufficient real data, don't silently
+  // fall back to the hidden manual defaults for anything that depends on
+  // conversion rates — that would compute a number the user never entered
+  // and can't see. Show "not enough data" for those instead; the deal/
+  // financial numbers above are unaffected since they don't depend on r.
+  const rOk = !insufficientReal;
+  const meetingsCompletedNeeded = (rOk && signedNeededTotal!==null && r.signedPct>0) ? signedNeededTotal/(r.signedPct/100) : null;
+  const meetingsScheduledNeeded = (meetingsCompletedNeeded!==null && r.meetingCompletionPct>0) ? meetingsCompletedNeeded/(r.meetingCompletionPct/100) : null;
+  const qualifiedNeeded = (meetingsScheduledNeeded!==null && r.meetingPct>0) ? meetingsScheduledNeeded/(r.meetingPct/100) : null;
+  const answeredNeeded = (qualifiedNeeded!==null && r.qualifiedPct>0) ? qualifiedNeeded/(r.qualifiedPct/100) : null;
+  const callsNeeded = (answeredNeeded!==null && r.answeredPct>0) ? answeredNeeded/(r.answeredPct/100) : null;
+
+  const workingDaysPerYear = calc.workMonths*calc.weeksPerMonth*calc.daysPerWeek;
+  const callsPerMonth = callsNeeded!==null ? callsNeeded/calc.workMonths : null;
+  const callsPerWeek = callsNeeded!==null ? callsNeeded/(calc.workMonths*calc.weeksPerMonth) : null;
+  const callsPerWorkDay = (callsNeeded!==null && workingDaysPerYear>0) ? callsNeeded/workingDaysPerYear : null;
+  const meetingsPerMonth = meetingsCompletedNeeded!==null ? meetingsCompletedNeeded/calc.workMonths : null;
+  const signedPerMonth = signedNeededTotal!==null ? signedNeededTotal/calc.workMonths : null;
+  const dealsPerQuarter = dealsTotalNeeded/4;
+
+  let comparison=null;
+  if(real.ok){
+    const projectedAnnualCalls = real.avgCallsPerActiveDay*workingDaysPerYear;
+    const projAnswered = projectedAnnualCalls*(real.answeredPct/100);
+    const projQualified = projAnswered*(real.qualifiedPct/100);
+    const projMeetingsSched = projQualified*(real.meetingPct/100);
+    const projMeetingsDone = projMeetingsSched*(real.meetingCompletionPct/100);
+    const projSigned = projMeetingsDone*(real.signedPct/100);
+    const projSalesDeals = projSigned*mixSales*(calc.exclusivityToSalePct/100);
+    const projRentalDeals = projSigned*mixRentals*(calc.brokerageToRentalPct/100);
+    const projRevenue = projSalesDeals*fullSaleCommission + projRentalDeals*calc.rentalCommission;
+    const projNetIncome = projRevenue*splitFactor-annualMarketing;
+    const forecastGap = projNetIncome-calc.income;
+    const extraCallsPerDay = callsPerWorkDay!==null ? Math.max(0, callsPerWorkDay-real.avgCallsPerActiveDay) : null;
+    const extraMeetingsPerMonth = meetingsPerMonth!==null ? Math.max(0, meetingsPerMonth-(projMeetingsDone/calc.workMonths)) : null;
+    const extraSignedTotal = signedNeededTotal!==null ? Math.max(0, signedNeededTotal-projSigned) : null;
+    const realistic = forecastGap>=0 ? 'good' : (forecastGap>=-Math.abs(calc.income)*0.2 ? 'close' : 'far');
+    comparison={ projectedAnnualCalls, projNetIncome, forecastGap, extraCallsPerDay, extraMeetingsPerMonth, extraSignedTotal, realistic };
+  }
+
+  return { insufficientReal, real, usingReal, annualMarketing, grossCommissionNeeded, achievedUserShare, achievedNetIncome, gapVsTarget,
+    dealsSalesNeeded, dealsRentalsNeeded, dealsTotalNeeded, signedNeededTotal,
+    meetingsCompletedNeeded, meetingsScheduledNeeded, qualifiedNeeded, callsNeeded,
+    callsPerMonth, callsPerWeek, callsPerWorkDay, meetingsPerMonth, signedPerMonth, dealsPerQuarter,
+    comparison };
+}
+
+const CALC_FIELDS=[
+  ['income','number'],['marketingMonthly','number'],['splitPct','pct'],
+  ['workMonths','number'],['weeksPerMonth','number'],['daysPerWeek','number'],
+  ['avgPrice','number'],['commissionPct','pct'],['exclusivityToSalePct','pct'],
+  ['rentalCommission','number'],['brokerageToRentalPct','pct'],
+];
+const CALC_MANUAL_FIELDS=[
+  ['callsPerDay','number'],['answeredPct','pct'],['qualifiedPct','pct'],
+  ['meetingPct','pct'],['meetingCompletionPct','pct'],['signedPct','pct'],
+];
+
+function calcField(key,label,value,manual){
+  const path = manual? `manual.${key}` : key;
+  const step = key.endsWith('Pct') ? '0.1' : 'any';
+  return `<div class="calc-row">
+    <label class="calc-label" for="cf_${key}">${label}</label>
+    <input class="num-field" id="cf_${key}" type="number" step="${step}" inputmode="decimal"
+      data-calc-key="${path}" value="${value}" />
+  </div>`;
+}
+
+function renderCalcInputs(){
+  const calc=state.calc;
+  document.querySelectorAll('#calcModeSeg .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===calc.mode));
+
+  document.getElementById('calcGeneral').innerHTML=[
+    calcField('income','יעד הכנסה שנתית נטו לפני מס (₪)',calc.income),
+    calcField('marketingMonthly','הוצאות שיווק חודשיות (₪)',calc.marketingMonthly),
+    calcField('splitPct','אחוז חלוקה ל-RE/MAX (%)',calc.splitPct),
+    calcField('workMonths','חודשי עבודה בשנה',calc.workMonths),
+    calcField('weeksPerMonth','שבועות ממוצעים בחודש',calc.weeksPerMonth),
+    calcField('daysPerWeek','ימי עבודה בשבוע',calc.daysPerWeek),
+  ].join('');
+
+  const fullCommission = calc.avgPrice*(calc.commissionPct/100);
+  document.getElementById('calcSales').innerHTML=[
+    calcField('avgPrice','מחיר נכס ממוצע (₪)',calc.avgPrice),
+    calcField('commissionPct','אחוז עמלה ממוצע (%)',calc.commissionPct),
+    `<div class="calc-row"><span class="calc-label">עמלה מלאה מחושבת אוטומטית</span><span class="calc-computed">${fmtMoney(fullCommission)}</span></div>`,
+    calcField('exclusivityToSalePct','אחוז חתימות בלעדיות שהופכות לעסקת מכירה (%)',calc.exclusivityToSalePct),
+  ].join('');
+
+  document.getElementById('calcRental').innerHTML=[
+    calcField('rentalCommission','עמלה מלאה ממוצעת לעסקת השכרה (₪)',calc.rentalCommission),
+    calcField('brokerageToRentalPct','אחוז הסכמי תיווך למשכירים שהופכים לעסקת השכרה (%)',calc.brokerageToRentalPct),
+  ].join('');
+
+  document.getElementById('calcMix').innerHTML=`
+    <div class="calc-row"><label class="calc-label" for="cf_mixSalesPct">מכירות (%)</label>
+      <input class="num-field" id="cf_mixSalesPct" type="number" step="1" inputmode="decimal" data-calc-key="mixSalesPct" value="${calc.mixSalesPct}" /></div>
+    <div class="calc-row"><label class="calc-label" for="cf_mixRentalsPct">השכרות (%)</label>
+      <input class="num-field" id="cf_mixRentalsPct" type="number" step="1" inputmode="decimal" data-calc-key="mixRentalsPct" value="${calc.mixRentalsPct}" /></div>
+    <p class="calc-mix-total">סה"כ: <span id="calcMixTotal">${(calc.mixSalesPct+calc.mixRentalsPct).toFixed(0)}</span>%</p>`;
+
+  const manualCard=document.getElementById('calcManualCard');
+  if(calc.mode==='manual'){
+    manualCard.hidden=false;
+    const real=getRealFunnelRatios();
+    document.getElementById('calcManual').innerHTML=CALC_MANUAL_FIELDS.map(([k,type])=>{
+      const label={ callsPerDay:'שיחות ליום עבודה', answeredPct:'אחוז מענה (%)', qualifiedPct:'אחוז שיחות איכותיות מתוך הנענות (%)',
+        meetingPct:'אחוז פגישות שנקבעות מתוך השיחות האיכותיות (%)', meetingCompletionPct:'אחוז השלמת פגישות (%)',
+        signedPct:'אחוז חתימות מתוך פגישות שהתקיימו (%)' }[k];
+      return calcField(k,label,calc.manual[k],true);
+    }).join('') + (real.ok?'':'<p class="muted-p" style="margin-top:10px">אין עדיין מספיק נתונים אמיתיים למילוי אוטומטי — ההנחות שלמעלה הן נקודת התחלה סבירה, אפשר לשנות אותן בחופשיות.</p>');
+  }else{
+    manualCard.hidden=true;
+  }
+
+  paintIcons();
+  renderCalcResults();
+}
+
+function renderCalcResults(){
+  const calc=state.calc, res=runCalculator();
+
+  const banner=document.getElementById('calcInsufficient');
+  banner.hidden = !res.insufficientReal;
+
+  document.getElementById('calcFinance').innerHTML=[
+    ['מחזור עמלות נדרש לפני חלוקת RE/MAX', fmtMoney(res.grossCommissionNeeded)],
+    ['חלק המשתמש לאחר החלוקה', fmtMoney(res.achievedUserShare)],
+    ['הוצאות שיווק שנתיות', fmtMoney(res.annualMarketing)],
+    ['הכנסה נטו צפויה לפני מס', fmtMoney(res.achievedNetIncome)],
+    ['פער מול היעד', fmtSigned(res.gapVsTarget)],
+  ].map(([n,v])=>`<div class="ratio"><span class="ratio-name">${n}</span><span class="ratio-val">${v}</span></div>`).join('');
+
+  document.getElementById('calcDeals').innerHTML=[
+    ['עסקאות מכירה נדרשות', fmtInt(res.dealsSalesNeeded)],
+    ['עסקאות השכרה נדרשות', fmtInt(res.dealsRentalsNeeded)],
+    ['סך העסקאות הנדרש', fmtInt(res.dealsTotalNeeded)],
+  ].map(([n,v])=>`<div class="ratio"><span class="ratio-name">${n}</span><span class="ratio-val">${v}</span></div>`).join('');
+
+  document.getElementById('calcActivity').innerHTML=[
+    ['חתימות נדרשות', fmtInt(res.signedNeededTotal)],
+    ['פגישות נדרשות', fmtInt(res.meetingsCompletedNeeded)],
+    ['שיחות איכותיות נדרשות', fmtInt(res.qualifiedNeeded)],
+    ['שיחות נדרשות', fmtInt(res.callsNeeded)],
+  ].map(([n,v])=>`<div class="ratio"><span class="ratio-name">${n}</span><span class="ratio-val">${v}</span></div>`).join('');
+
+  document.getElementById('calcTime').innerHTML=[
+    ['שיחות בשנה', fmtInt(res.callsNeeded)],
+    ['שיחות בחודש', fmtInt(res.callsPerMonth)],
+    ['שיחות בשבוע', fmtInt(res.callsPerWeek)],
+    ['שיחות ביום עבודה', fmtInt(res.callsPerWorkDay)],
+    ['פגישות בחודש', fmtInt(res.meetingsPerMonth)],
+    ['חתימות בחודש', fmtInt(res.signedPerMonth)],
+    ['עסקאות ברבעון', fmtInt(res.dealsPerQuarter)],
+    ['עסקאות בשנה', fmtInt(res.dealsTotalNeeded)],
+  ].map(([n,v])=>`<div class="ratio"><span class="ratio-name">${n}</span><span class="ratio-val">${v}</span></div>`).join('');
+
+  const cmpCard=document.getElementById('calcComparisonCard');
+  if(res.comparison){
+    cmpCard.hidden=false;
+    const c=res.comparison;
+    const badge={ good:['היעד ריאלי בקצב הנוכחי','var(--good)'], close:['קרוב ליעד — נדרש שיפור קל','var(--gold)'], far:['רחוק מהיעד — נדרש שיפור משמעותי','var(--danger)'] }[c.realistic];
+    document.getElementById('calcComparison').innerHTML=[
+      ['יעד שנתי', fmtMoney(calc.income)],
+      ['תחזית שנתית לפי הקצב הנוכחי', fmtMoney(c.projNetIncome)],
+      ['פער צפוי', fmtSigned(c.forecastGap)],
+      ['שיחות נוספות ביום הדרושות', fmtInt(c.extraCallsPerDay)],
+      ['פגישות נוספות בחודש הדרושות', fmtInt(c.extraMeetingsPerMonth)],
+      ['חתימות נוספות הדרושות', fmtInt(c.extraSignedTotal)],
+    ].map(([n,v])=>`<div class="ratio"><span class="ratio-name">${n}</span><span class="ratio-val">${v}</span></div>`).join('')
+      + `<div class="calc-badge" style="color:${badge[1]};border-color:${badge[1]}">${badge[0]}</div>`;
+  }else{
+    cmpCard.hidden=true;
+  }
+}
+
+function wireCalc(){
+  document.getElementById('calcModeSeg').addEventListener('click',e=>{
+    const b=e.target.closest('[data-mode]'); if(!b)return;
+    state.calc.mode=b.dataset.mode;
+    if(state.calc.mode==='manual'){
+      // Switching into manual mode seeds it from real data as a starting
+      // point (only if there's enough of it) — never resets a scenario
+      // the user has already customized.
+      const real=getRealFunnelRatios();
+      if(real.ok && !state.calc._seededFromReal){
+        Object.assign(state.calc.manual, {
+          callsPerDay:Math.round(real.avgCallsPerActiveDay*10)/10,
+          answeredPct:Math.round(real.answeredPct*10)/10, qualifiedPct:Math.round(real.qualifiedPct*10)/10,
+          meetingPct:Math.round(real.meetingPct*10)/10, meetingCompletionPct:Math.round(real.meetingCompletionPct*10)/10,
+          signedPct:Math.round(real.signedPct*10)/10,
+        });
+        state.calc._seededFromReal=true;
+      }
+    }
+    save(); pushSettings(); renderCalcInputs();
+  });
+
+  // Delegated input handler covers every generated field, including ones
+  // added later (manual card, mix pair) without re-wiring per render.
+  document.getElementById('view-calc').addEventListener('input',e=>{
+    const el=e.target.closest('[data-calc-key]'); if(!el)return;
+    const val=parseFloat(el.value);
+    if(isNaN(val))return;
+    const path=el.dataset.calcKey;
+    if(path.startsWith('manual.')) state.calc.manual[path.slice(7)]=val;
+    else state.calc[path]=val;
+
+    // Keep the sales/rentals mix pair summing to 100 automatically instead
+    // of allowing (and having to validate against) an invalid total.
+    if(path==='mixSalesPct'||path==='mixRentalsPct'){
+      const other = path==='mixSalesPct' ? 'mixRentalsPct' : 'mixSalesPct';
+      state.calc[other]=Math.max(0, 100-val);
+      const otherEl=document.getElementById('cf_'+other);
+      if(otherEl) otherEl.value=state.calc[other];
+      const totalEl=document.getElementById('calcMixTotal');
+      if(totalEl) totalEl.textContent=(state.calc.mixSalesPct+state.calc.mixRentalsPct).toFixed(0);
+    }
+    save(); pushSettingsDebounced();
+    renderCalcResults();
+  });
+}
+
+/* ============================================================
    Export / import
    ============================================================ */
 function download(filename, text, type){
@@ -654,7 +1000,7 @@ function importJSON(file){
       if(!s||!Array.isArray(s.events))throw new Error('bad file');
       if(!confirm(`לייבא ${s.events.length} רשומות? פעולה זו תחליף את הנתונים הנוכחיים.`))return;
       state={ events:s.events, goals:Object.assign({call:25,meetingCompleted:3},s.goals||{}),
-        audience:AUDIENCES[s.audience]?s.audience:'seller' };
+        audience:AUDIENCES[s.audience]?s.audience:'seller', calc:mergeCalc(s.calc) };
       save();
       if(currentUserId){
         // Upsert is idempotent, so queuing every imported row is safe even
@@ -675,15 +1021,21 @@ function setView(v){
   ui.view=v;
   document.querySelectorAll('.view').forEach(s=>s.hidden = s.id!=='view-'+v);
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
-  // The top day selector belongs to day-based screens; Stats has its own
-  // period filters, so hide it there to avoid confusion.
-  document.getElementById('dateBtn').hidden = (v==='stats');
+  // The top day selector belongs to day-based screens; Stats and the
+  // calculator have their own scope, so hide it there to avoid confusion.
+  document.getElementById('dateBtn').hidden = (v==='stats'||v==='calc');
   if(v==='dashboard')renderDashboard();
   if(v==='stats')renderStats();
   if(v==='data')renderData();
+  if(v==='calc')renderCalcInputs();
   window.scrollTo({top:0,behavior:'smooth'});
 }
-function renderAll(){ renderDashboard(); if(ui.view==='stats')renderStats(); if(ui.view==='data')renderData(); }
+function renderAll(){
+  renderDashboard();
+  if(ui.view==='stats')renderStats();
+  if(ui.view==='data')renderData();
+  if(ui.view==='calc')renderCalcResults();
+}
 
 function wire(){
   paintIcons();
@@ -739,6 +1091,8 @@ function wire(){
       lastToday=t;
     }
   }, 30000);
+
+  wireCalc();
 }
 
 /* Offline support — register the service worker when served over http(s). */
@@ -840,9 +1194,10 @@ function applyCloudSnapshot(cloud){
   const events=[...byId.values()].sort((a,b)=>a.ts-b.ts);
   let goals = cloud.goals || state.goals;
   let audience = cloud.audience || state.audience;
+  let calc = cloud.calc ? mergeCalc(cloud.calc) : state.calc;
   const settingsOp=pending.find(op=>op.type==='upsert_settings');
-  if(settingsOp){ goals=settingsOp.row.goals; audience=settingsOp.row.audience; }
-  state={events,goals,audience};
+  if(settingsOp){ goals=settingsOp.row.goals; audience=settingsOp.row.audience; calc=mergeCalc(settingsOp.row.calc_settings); }
+  state={events,goals,audience,calc};
   save();
   if(isFirstEverSync) pushSettings(); // seed this brand-new account's settings row
 }
@@ -912,7 +1267,7 @@ function onRemoteEventChange(payload){
 function onRemoteSettingsChange(payload){
   const {eventType,new:newRow}=payload;
   if(eventType==='DELETE'||!newRow)return;
-  state.goals=newRow.goals; state.audience=newRow.audience;
+  state.goals=newRow.goals; state.audience=newRow.audience; state.calc=mergeCalc(newRow.calc_settings);
   save();
   renderAll();
 }

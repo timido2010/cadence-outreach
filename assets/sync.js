@@ -70,6 +70,7 @@ const CadenceSync = (() => {
       events: (rows || []).map(rowToEvent),
       goals: settingsRow ? settingsRow.goals : null,
       audience: settingsRow ? settingsRow.audience : null,
+      calc: settingsRow ? settingsRow.calc_settings : null,
     };
   }
 
