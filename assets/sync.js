@@ -47,6 +47,18 @@ const CadenceSync = (() => {
     unsubscribeRealtime();
     await client.auth.signOut();
   }
+  // Sends a reset-password email whose link brings the user back to this
+  // same app URL; Supabase then fires a PASSWORD_RECOVERY auth event with a
+  // live (recovery) session, which the caller uses to set a new password.
+  async function resetPasswordForEmail(email) {
+    const redirectTo = location.href.split('#')[0].split('?')[0];
+    const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+    return { error };
+  }
+  async function updatePassword(newPassword) {
+    const { error } = await client.auth.updateUser({ password: newPassword });
+    return { error };
+  }
 
   /* ---------- row <-> app-event mapping ---------- */
   function eventToRow(ev, userId) {
@@ -189,7 +201,7 @@ const CadenceSync = (() => {
 
   return {
     init, isConfigured, onAuthChange,
-    signUp, signIn, signOut,
+    signUp, signIn, signOut, resetPasswordForEmail, updatePassword,
     fetchAll, deleteAllCloudData,
     enqueueUpsertEvent, enqueueDeleteEvent, enqueueUpsertSettings,
     flush, pendingCount, peekOutbox, clearOutbox,

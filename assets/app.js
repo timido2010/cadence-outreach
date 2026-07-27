@@ -1112,7 +1112,43 @@ function showApp(){
   document.getElementById('app').hidden=false;
 }
 
+// 'signin' (default) | 'signup' (unreachable — toggle stays hidden) |
+// 'forgot' (request a reset email) | 'reset' (set a new password after
+// clicking the emailed link).
 let authMode='signin';
+let pendingRecoverySession=null; // session from a PASSWORD_RECOVERY event, used once the user picks a new password
+
+function setAuthMode(mode){
+  authMode=mode;
+  const submitBtn=document.getElementById('authSubmit');
+  const emailWrap=document.getElementById('authEmailWrap');
+  const passWrap=document.getElementById('authPasswordWrap');
+  const passLabel=document.getElementById('authPasswordLabel');
+  const passInput=document.getElementById('authPassword');
+  const forgotBtn=document.getElementById('authForgotBtn');
+  const backBtn=document.getElementById('authBackToSignin');
+  const errEl=document.getElementById('authError');
+  errEl.hidden=true; errEl.style.color='';
+
+  emailWrap.hidden = (mode==='reset');
+  passWrap.hidden = (mode==='forgot');
+  forgotBtn.hidden = (mode!=='signin');
+  backBtn.hidden = (mode==='signin');
+  passInput.required = (mode!=='forgot');
+
+  if(mode==='signin'){
+    document.getElementById('authSub').textContent='התחברות לחשבון הענן שלכם';
+    submitBtn.textContent='התחברות'; passLabel.textContent='סיסמה'; passInput.autocomplete='current-password';
+  }else if(mode==='forgot'){
+    document.getElementById('authSub').textContent='הזינו את האימייל שלכם ונשלח קישור לאיפוס הסיסמה';
+    submitBtn.textContent='שליחת קישור לאיפוס';
+  }else if(mode==='reset'){
+    document.getElementById('authSub').textContent='הזינו סיסמה חדשה לחשבון שלכם';
+    submitBtn.textContent='עדכון סיסמה'; passLabel.textContent='סיסמה חדשה'; passInput.autocomplete='new-password';
+    passInput.value='';
+  }
+}
+
 function wireAuthForm(){
   const form=document.getElementById('authForm');
   const toggleBtn=document.getElementById('authToggleMode');
@@ -1125,6 +1161,8 @@ function wireAuthForm(){
     toggleBtn.textContent = authMode==='signin' ? 'אין לי חשבון — יצירת חשבון חדש' : 'יש לי כבר חשבון — התחברות';
     errEl.hidden=true;
   });
+  document.getElementById('authForgotBtn').addEventListener('click',()=>setAuthMode('forgot'));
+  document.getElementById('authBackToSignin').addEventListener('click',()=>setAuthMode('signin'));
 
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -1136,6 +1174,23 @@ function wireAuthForm(){
     const password=document.getElementById('authPassword').value;
     errEl.hidden=true; errEl.style.color=''; submitBtn.disabled=true;
     try{
+      if(authMode==='forgot'){
+        const {error}=await CadenceSync.resetPasswordForEmail(email);
+        if(error){ errEl.textContent=translateAuthError(error); errEl.hidden=false; return; }
+        errEl.style.color='var(--good)';
+        errEl.textContent='אם קיים חשבון עם אימייל זה, נשלח אליו קישור לאיפוס הסיסמה. בדקו את תיבת הדואר.';
+        errEl.hidden=false;
+        return;
+      }
+      if(authMode==='reset'){
+        const {error}=await CadenceSync.updatePassword(password);
+        if(error){ errEl.textContent=translateAuthError(error); errEl.hidden=false; return; }
+        toast('הסיסמה עודכנה');
+        const session=pendingRecoverySession; pendingRecoverySession=null;
+        setAuthMode('signin');
+        if(session) onSignedIn(session);
+        return;
+      }
       const fn = authMode==='signin' ? CadenceSync.signIn : CadenceSync.signUp;
       const {error} = await fn(email,password);
       if(error){ errEl.textContent=translateAuthError(error); errEl.hidden=false; return; }
@@ -1290,7 +1345,15 @@ async function boot(){
   // was persisted from a previous visit, then again on every future
   // sign-in/sign-out — one listener covers both the initial restore and
   // subsequent auth changes.
-  CadenceSync.onAuthChange((session)=>{
+  CadenceSync.onAuthChange((session,event)=>{
+    if(event==='PASSWORD_RECOVERY' && session){
+      // The user landed here from the reset-password email link — collect
+      // a new password instead of treating this as a normal sign-in.
+      pendingRecoverySession=session;
+      showAuthScreen();
+      setAuthMode('reset');
+      return;
+    }
     if(session && session.user.id!==currentUserId){ onSignedIn(session); }
     else if(!session && currentUserId!==null){ onSignedOut(); }
     else if(!session){ showAuthScreen(); }
