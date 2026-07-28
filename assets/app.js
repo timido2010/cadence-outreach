@@ -315,11 +315,21 @@ function renderFunnel(counts){
   }).join('');
 }
 
+// The daily calls goal comes from מחשבון יעדים when a usable target exists
+// (a single source of truth instead of two numbers that can silently
+// disagree); otherwise it falls back to the plain manually-set number.
+// Meetings stays manual-only — a monthly figure doesn't divide into a
+// meaningful whole-number daily target the way calls does.
+function callsGoalFromCalc(){
+  const res=runCalculator();
+  return (res.callsPerWorkDay!==null && res.callsPerWorkDay>0) ? Math.round(res.callsPerWorkDay) : null;
+}
 function renderGoals(){
   // Goals are global for the day (all audiences combined).
   const c=dayCounts(ui.activeDate,null);
+  const calcCallGoal=callsGoalFromCalc();
   const rows=[
-    {key:'call', name:'שיחות', val:c.call, goal:state.goals.call},
+    {key:'call', name:'שיחות', val:c.call, goal:calcCallGoal!==null?calcCallGoal:state.goals.call, fromCalc:calcCallGoal!==null},
     {key:'meetingCompleted', name:'פגישות שהתקיימו', val:c.meetingCompleted, goal:state.goals.meetingCompleted},
   ];
   document.getElementById('goals').innerHTML=rows.map(r=>{
@@ -328,7 +338,7 @@ function renderGoals(){
     const color= done? 'var(--good)' : (r.key==='call'?'var(--accent)':'var(--gold)');
     return `<div class="goal ${done?'done':''}">
       <div class="goal-top">
-        <span class="goal-name">${r.name}</span>
+        <span class="goal-name">${r.name}${r.fromCalc?'<span class="goal-src">מהמחשבון</span>':''}</span>
         <span class="goal-nums" dir="ltr">${r.val} <span class="goal-goal">/ ${r.goal}</span></span>
       </div>
       <div class="goal-bar"><i style="width:${pct}%;background:${color}"></i></div>
@@ -458,15 +468,21 @@ function openCustomRangeSheet(){
 
 function openGoalsSheet(){
   openSheet('יעדים יומיים');
+  const calcCallGoal=callsGoalFromCalc();
   sheetBody.innerHTML=`
     <p class="muted-p">יעד אחד לכל היום, משותף לכל סוגי הקהל.</p>
     <div class="adj-row">
       <span class="adj-name">שיחות ליום</span>
-      <div class="adj-stepper">
-        <button class="step-btn" data-g="call" data-dir="-1" type="button">−</button>
-        <span class="adj-count" id="gcall">${state.goals.call}</span>
-        <button class="step-btn" data-g="call" data-dir="1" type="button">+</button>
-      </div>
+      ${calcCallGoal!==null
+        ? `<div class="calc-goal-note">
+             <span class="calc-goal-note-val">${calcCallGoal}</span>
+             <span class="calc-goal-note-txt">נגזר אוטומטית ממחשבון היעדים</span>
+           </div>`
+        : `<div class="adj-stepper">
+             <button class="step-btn" data-g="call" data-dir="-1" type="button">−</button>
+             <span class="adj-count" id="gcall">${state.goals.call}</span>
+             <button class="step-btn" data-g="call" data-dir="1" type="button">+</button>
+           </div>`}
     </div>
     <div class="adj-row">
       <span class="adj-name">פגישות שהתקיימו ליום</span>
@@ -476,13 +492,18 @@ function openGoalsSheet(){
         <button class="step-btn" data-g="meetingCompleted" data-dir="1" type="button">+</button>
       </div>
     </div>
+    ${calcCallGoal!==null?`<button class="ghost-wide press" id="goalsEditInCalc" type="button"><span data-icon="calc"></span><span>עריכת יעד השיחות במחשבון יעדים</span></button>`:''}
     <button class="sheet-cta press" id="goalsSave" type="button">שמירת יעדים</button>`;
+  paintIcons(sheetBody);
   const draft={...state.goals};
   sheetBody.querySelectorAll('.step-btn').forEach(b=>b.addEventListener('click',()=>{
     const g=b.dataset.g, step= g==='call'?1:1;
     draft[g]=Math.max(0, draft[g]+Number(b.dataset.dir)*step);
     document.getElementById(g==='call'?'gcall':'gmeet').textContent=draft[g];
   }));
+  document.getElementById('goalsEditInCalc')?.addEventListener('click',()=>{
+    closeSheet(); setView('calc');
+  });
   document.getElementById('goalsSave').addEventListener('click',()=>{
     state.goals=draft; save(); pushSettings(); renderDashboard(); toast('היעדים עודכנו'); closeSheet();
   });

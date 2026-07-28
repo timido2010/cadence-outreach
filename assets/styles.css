@@ -195,6 +195,11 @@ svg{display:block}
 .goal{display:flex;flex-direction:column;gap:7px}
 .goal-top{display:flex;align-items:baseline;justify-content:space-between}
 .goal-name{font-size:12.5px;color:var(--muted);font-weight:550}
+.goal-src{
+  display:inline-block;margin-inline-start:6px;padding:2px 7px;border-radius:99px;
+  font-size:9.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);
+  vertical-align:middle;letter-spacing:.01em;
+}
 .goal-nums{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
 .goal-nums .goal-goal{color:var(--muted-2);font-weight:600}
 .goal-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
@@ -491,3 +496,6 @@ svg{display:block}
   margin-top:12px;padding:11px 13px;border-radius:var(--radius);text-align:center;
   font-size:13.5px;font-weight:700;background:rgba(255,255,255,.03);border:1px solid;
 }
+.calc-goal-note{display:flex;align-items:center;gap:8px}
+.calc-goal-note-val{font-size:18px;font-weight:750;color:var(--accent);font-variant-numeric:tabular-nums}
+.calc-goal-note-txt{font-size:11.5px;color:var(--muted-2)}
