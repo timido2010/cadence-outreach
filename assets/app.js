@@ -725,7 +725,15 @@ function getRealFunnelRatios(){
   const meetingPct = cMeeting.qualified>0 ? cMeeting.meetingScheduled/cMeeting.qualified*100 : 0;
   const meetingCompletionPct = cMeeting.meetingScheduled>0 ? cMeeting.meetingCompleted/cMeeting.meetingScheduled*100 : 0;
   const signedPct = cMeeting.meetingCompleted>0 ? cMeeting.signed/cMeeting.meetingCompleted*100 : 0;
-  const ok = c.call>0 && c.answered>0 && c.qualified>0 && cMeeting.meetingScheduled>0 && cMeeting.meetingCompleted>0 && cMeeting.signed>0;
+  // Every ratio's actual denominator must be checked here, not just
+  // c.qualified (blended across all audiences) — meetingPct specifically
+  // divides by cMeeting.qualified (Seller/Buyer only), which can be zero
+  // even when c.qualified isn't (e.g. most real qualified conversations
+  // came from Landlord activity). Missing this let the calculation
+  // proceed into a silent division that produced "not enough data" deep
+  // in the chain without ever showing the insufficient-data banner.
+  const ok = c.call>0 && c.answered>0 && c.qualified>0
+    && cMeeting.qualified>0 && cMeeting.meetingScheduled>0 && cMeeting.meetingCompleted>0 && cMeeting.signed>0;
   return { raw:c, activeDays:n, avgCallsPerActiveDay, answeredPct, qualifiedPct, meetingPct, meetingCompletionPct, signedPct, ok };
 }
 
